@@ -95,8 +95,8 @@ export default function DiscoveryPage() {
 
                     {/* Next Stage CTA */}
                     <div className="flex justify-end pt-4 pb-10">
-                        <Link href="/gaps" className="flex items-center gap-2 px-8 py-4 bg-primary text-white font-bold text-lg rounded-xl hover:bg-blue-700 hover:-translate-y-1 transition-all shadow-lg shadow-primary/30">
-                            Run Stage 4 Skill Gap Analysis <span className="material-symbols-outlined">analytics</span>
+                        <Link href="/careers" className="flex items-center gap-2 px-8 py-4 bg-primary text-white font-bold text-lg rounded-xl hover:bg-blue-700 hover:-translate-y-1 transition-all shadow-lg shadow-primary/30">
+                            Discover Career Paths <span className="material-symbols-outlined">explore</span>
                         </Link>
                     </div>
                 </div>

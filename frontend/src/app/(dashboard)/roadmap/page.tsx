@@ -103,8 +103,8 @@ export default function RoadmapPage() {
 
                     {/* Next Stage CTA */}
                     <div className="flex justify-end pt-4 pb-10 relative z-10 mt-4">
-                        <Link href="/portfolio" className="flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-bold text-lg rounded-xl hover:bg-emerald-700 hover:-translate-y-1 transition-all shadow-lg shadow-emerald-600/30">
-                            Skip to Stage 6: Publish Portfolio <span className="material-symbols-outlined">public</span>
+                        <Link href="/simulation" className="flex items-center gap-2 px-8 py-4 bg-violet-600 text-white font-bold text-lg rounded-xl hover:bg-violet-700 hover:-translate-y-1 transition-all shadow-lg shadow-violet-600/30">
+                            Start Career Simulation <span className="material-symbols-outlined">science</span>
                         </Link>
                     </div>
                 </div>

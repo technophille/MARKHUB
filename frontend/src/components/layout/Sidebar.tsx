@@ -3,10 +3,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-    { name: "Discovery (Stage 2/3)", icon: "explore", path: "/discovery" },
-    { name: "Skill Gaps (Stage 4)", icon: "track_changes", path: "/gaps" },
-    { name: "Roadmap (Stage 5/7)", icon: "map", path: "/roadmap" },
-    { name: "Portfolio (Stage 6)", icon: "folder", path: "/portfolio" },
+    { name: "Skill Analysis", icon: "psychology", path: "/discovery", stage: "1" },
+    { name: "Career Paths", icon: "explore", path: "/careers", stage: "2" },
+    { name: "Skill Gaps", icon: "track_changes", path: "/gaps", stage: "3" },
+    { name: "Roadmap", icon: "map", path: "/roadmap", stage: "4" },
+    { name: "Simulation", icon: "science", path: "/simulation", stage: "5" },
+    { name: "Projects", icon: "code", path: "/projects", stage: "6" },
+    { name: "Readiness", icon: "speed", path: "/readiness", stage: "7" },
+    { name: "Job Match", icon: "work", path: "/jobs", stage: "8" },
 ];
 
 export function Sidebar() {
@@ -20,7 +24,7 @@ export function Sidebar() {
                 </div>
                 <div className="flex flex-col">
                     <h1 className="text-white text-lg font-bold leading-tight tracking-tight">Markhub AI</h1>
-                    <p className="text-slate-400 text-xs font-medium">Career Platform</p>
+                    <p className="text-slate-400 text-xs font-medium">Career OS</p>
                 </div>
             </div>
             <nav className="flex-1 px-4 py-4 flex flex-col gap-1">
@@ -36,7 +40,8 @@ export function Sidebar() {
                                 }`}
                         >
                             <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                            <span className="text-sm font-medium">{item.name}</span>
+                            <span className="text-sm font-medium flex-1">{item.name}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isActive ? "bg-primary/30 text-primary" : "bg-slate-800 text-slate-500"}`}>{item.stage}</span>
                         </Link>
                     );
                 })}
