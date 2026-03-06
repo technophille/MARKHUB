@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Markhub Verified Portfolio Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2469eb",
+                        "background-light": "#f9fafb", // bg-gray-50
+                        "background-dark": "#111621",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex">
+<aside class="w-64 bg-slate-900 dark:bg-slate-950 flex flex-col h-screen fixed left-0 top-0 overflow-y-auto">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-primary rounded-lg size-10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white">psychology</span>
+</div>
+<div class="flex flex-col">
+<h1 class="text-white text-lg font-bold leading-tight tracking-tight">Markhub AI</h1>
+<p class="text-slate-400 text-xs font-medium">Career Platform</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">explore</span>
+<span class="text-sm font-medium">Discovery</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span class="text-sm font-medium">Exploration</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">track_changes</span>
+<span class="text-sm font-medium">Skill Gaps</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">map</span>
+<span class="text-sm font-medium">Roadmap</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">work</span>
+<span class="text-sm font-medium">Projects</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">folder</span>
+<span class="text-sm font-medium">Portfolio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+<span class="text-sm font-medium">Interviews</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">business</span>
+<span class="text-sm font-medium">Jobs</span>
+</a>
+</nav>
+<div class="p-4 mt-auto">
+<div class="flex items-center gap-3 px-3 py-3 rounded-lg bg-slate-800 border border-slate-700">
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-8" data-alt="User profile avatar image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDV4MnVFxCRCZ8TLKX3dWQSrD-mF4C7dBzq3-00G72rkMPvTBqu8GYpoyt1qzU8Clazpl9usFy9WZMxWa3B4O-Wezi78apuhQajoCYlnS-Y3c4oN4GqnTfImHNOvoeaN1p3DqzUdrgduSz7GIjKUpzPU2GQegKckJarzO6Aqm91A8m3WHrhxIRDUxNBEZ7k3BCoj6NQfRZQ-rjy0PV9F4DaBmzyw_dqAZzA0Lfb0F1KzpmIehS18YA584_4NAf2XPNV4OWk5-0iu-Y");'></div>
+<div class="flex flex-col flex-1 min-w-0">
+<p class="text-white text-sm font-medium truncate">Nikhil K Menon</p>
+<p class="text-slate-400 text-xs truncate">Basic Plan</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-[18px]">more_vert</span>
+</div>
+</div>
+</aside>
+<main class="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark px-8 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-4">
+<h2 class="text-xl font-bold text-slate-800 dark:text-white">Markhub Verified Portfolio</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-8">
+<div class="max-w-5xl mx-auto flex flex-col gap-8">
+<div class="flex flex-col gap-2">
+<h1 class="text-3xl font-black leading-tight tracking-tight text-slate-900 dark:text-white">Markhub Verified Portfolio</h1>
+<p class="text-slate-600 dark:text-slate-400">Shareable, AI-verified record of your technical projects and skills.</p>
+</div>
+<div class="flex flex-col gap-8">
+<div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 rounded-2xl p-8 shadow-xl flex items-center gap-8 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+<span class="material-symbols-outlined text-[120px] text-white">verified</span>
+</div>
+<div class="size-24 rounded-full border-4 border-white/10 overflow-hidden shrink-0 bg-slate-800 flex items-center justify-center relative z-10">
+<span class="material-symbols-outlined text-4xl text-slate-400">person</span>
+</div>
+<div class="flex flex-col gap-1 relative z-10 text-white">
+<div class="flex items-center gap-2">
+<h2 class="text-3xl font-bold tracking-tight">Nikhil K Menon</h2>
+<span class="material-symbols-outlined text-blue-400 text-[20px]" title="Markhub Verified">verified</span>
+</div>
+<p class="text-lg text-slate-300 font-medium">Technological and Digital Affairs Lead</p>
+<div class="flex gap-4 mt-3">
+<button class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-colors backdrop-blur-sm">
+<span class="material-symbols-outlined text-[18px]">share</span> Share Portfolio
+                        </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors">
+<span class="material-symbols-outlined text-[18px]">download</span> Download Resume
+                        </button>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="flex flex-col gap-4">
+<h3 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">work_history</span>
+                            AI-Verified Projects
+                        </h3>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm flex flex-col gap-4">
+<ul class="flex flex-col gap-6">
+<li class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-slate-200 dark:bg-slate-800 last:hidden"></div>
+<div class="size-6 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0 z-10 border-2 border-white dark:border-slate-900">
+<span class="material-symbols-outlined text-[12px] text-blue-600 dark:text-blue-400">check</span>
+</div>
+<div class="flex flex-col gap-1 pb-2">
+<h4 class="font-bold text-slate-900 dark:text-white">Cloud Server Log Filter</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400">Built a high-performance log filtering system in Python for real-time cyberattack detection.</p>
+</div>
+</li>
+<li class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-slate-200 dark:bg-slate-800 last:hidden"></div>
+<div class="size-6 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0 z-10 border-2 border-white dark:border-slate-900">
+<span class="material-symbols-outlined text-[12px] text-blue-600 dark:text-blue-400">check</span>
+</div>
+<div class="flex flex-col gap-1 pb-2">
+<h4 class="font-bold text-slate-900 dark:text-white">Automated Vulnerability Scanner</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400">Developed a scalable microservice to continuously scan and report known CVEs in web applications.</p>
+</div>
+</li>
+<li class="flex gap-4 relative">
+<div class="absolute left-[11px] top-6 bottom-[-24px] w-[2px] bg-slate-200 dark:bg-slate-800 hidden"></div>
+<div class="size-6 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0 z-10 border-2 border-white dark:border-slate-900">
+<span class="material-symbols-outlined text-[12px] text-blue-600 dark:text-blue-400">check</span>
+</div>
+<div class="flex flex-col gap-1 pb-2">
+<h4 class="font-bold text-slate-900 dark:text-white">Secure Identity Access Portal</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400">Implemented OAuth2 and SAML integrations for a unified enterprise SSO dashboard.</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<h3 class="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">military_tech</span>
+                            AI-Verified Skills
+                        </h3>
+<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm flex flex-col gap-4">
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Cloud Computing
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Cybersecurity
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Networking
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Python
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Zero Trust Architecture
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Docker
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> IAM
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> OAuth2 / SAML
+                                </span>
+<span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-emerald-500">verified</span> Microservices
+                                </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed bottom-6 right-6 z-50 group">
+<button class="bg-slate-900 dark:bg-white text-white dark:text-slate-900 p-4 rounded-full shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center gap-2 hover:scale-105 transform transition-transform">
+<span class="material-symbols-outlined">forum</span>
+<span class="font-bold text-sm hidden group-hover:block pr-2">Ask Markhub AI</span>
+</button>
+</div>
+</body></html>

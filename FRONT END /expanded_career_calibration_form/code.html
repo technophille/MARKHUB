@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Career Calibration Form | Markhub AI</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#266ced",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display transition-colors duration-300">
+    <div class="relative flex min-h-screen flex-col items-center">
+        <!-- Top Navigation -->
+        <header
+            class="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-slate-800 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-6 py-4">
+            <div class="mx-auto flex max-w-5xl items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20">
+                        <span class="material-symbols-outlined">auto_awesome</span>
+                    </div>
+                    <h2 class="text-xl font-bold tracking-tight">Markhub AI</h2>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                        <span class="material-symbols-outlined text-slate-600 dark:text-slate-400">notifications</span>
+                    </button>
+                    <button
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors overflow-hidden">
+                        <span class="material-symbols-outlined text-slate-600 dark:text-slate-400">account_circle</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+        <!-- Main Content -->
+        <main class="w-full max-w-3xl flex-1 px-6 py-12 pb-32">
+            <div class="mb-10">
+                <h1 class="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 mb-3">Career
+                    Calibration Form</h1>
+                <p class="text-lg text-slate-500 dark:text-slate-400">Let's build your personalized Markhub OS profile.
+                    Complete the sections below to get started.</p>
+            </div>
+            <div
+                class="flex flex-col gap-12 bg-white dark:bg-slate-900/50 p-8 md:p-12 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                <!-- 1. Foundation -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">1</span>
+                        <h3 class="text-xl font-bold">Foundation</h3>
+                    </div>
+                    <label
+                        class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-4 uppercase tracking-wider">Upload
+                        your latest Resume (PDF)</label>
+                    <div
+                        class="group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 px-6 py-12 transition-all hover:border-primary/50 hover:bg-primary/5">
+                        <span
+                            class="material-symbols-outlined text-4xl text-slate-400 group-hover:text-primary transition-colors mb-4">cloud_upload</span>
+                        <p class="text-slate-900 dark:text-slate-200 font-semibold mb-1">Drag and drop your resume</p>
+                        <p class="text-slate-500 text-sm mb-6">PDF, DOCX up to 10MB</p>
+                        <button
+                            class="rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-6 py-2 text-sm font-bold shadow-sm hover:shadow-md transition-all">Browse
+                            Files</button>
+                    </div>
+                </section>
+                <!-- 2. Discovery -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">2</span>
+                        <h3 class="text-xl font-bold">Discovery</h3>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">Describe the most
+                        complex problem you recently solved.</label>
+                    <textarea
+                        class="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:border-primary focus:ring-primary dark:text-slate-200 placeholder:text-slate-400"
+                        placeholder="I optimized a database query that reduced latency by 40%..." rows="4"></textarea>
+                </section>
+                <!-- 3. Exploration -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">3</span>
+                        <h3 class="text-xl font-bold">Exploration</h3>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">Select your Target
+                        Roles</label>
+                    <div class="flex flex-wrap gap-2"><button
+                            class="px-4 py-2 rounded-full border border-primary bg-primary text-white text-sm font-medium transition-all">Cloud
+                            Architect</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Product
+                            Manager</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Data
+                            Scientist</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Full
+                            Stack Engineer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">DevOps
+                            Specialist</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">UX
+                            Designer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Frontend
+                            Developer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Backend
+                            Developer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Mobile
+                            App Developer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Cybersecurity
+                            Analyst</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">AI/ML
+                            Engineer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Database
+                            Administrator</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">QA
+                            Engineer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Project
+                            Manager</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Business
+                            Analyst</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Systems
+                            Architect</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Site
+                            Reliability Engineer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Data
+                            Engineer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Technical
+                            Writer</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Solutions
+                            Architect</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Software
+                            Architect</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">IT
+                            Consultant</button>
+                        <button
+                            class="px-4 py-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-sm font-medium hover:border-primary/50 transition-all">Blockchain
+                            Developer</button>
+                    </div>
+                </section>
+                <!-- 4. Skills -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">4</span>
+                        <h3 class="text-xl font-bold">Skills</h3>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">Current Top
+                        Skills</label>
+                    <div class="flex flex-col gap-3">
+                        <div class="relative">
+                            <input
+                                class="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:border-primary focus:ring-primary pr-12"
+                                placeholder="Add a skill (e.g., Python, AWS)" type="text" />
+                            <button
+                                class="absolute right-2 top-1.5 flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
+                                <span class="material-symbols-outlined text-lg">add</span>
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2 pt-2">
+                            <span
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold uppercase">
+                                Python <span class="material-symbols-outlined text-sm cursor-pointer">close</span>
+                            </span>
+                            <span
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold uppercase">
+                                AWS <span class="material-symbols-outlined text-sm cursor-pointer">close</span>
+                            </span>
+                            <span
+                                class="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-bold uppercase">
+                                Kubernetes <span class="material-symbols-outlined text-sm cursor-pointer">close</span>
+                            </span>
+                        </div>
+                    </div>
+                </section>
+                <!-- 5. Roadmap -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">5</span>
+                        <h3 class="text-xl font-bold">Roadmap</h3>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-8">Learning Bandwidth
+                        (Hours/Week)</label>
+                    <div class="px-2">
+                        <input
+                            class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
+                            max="40" min="0" step="5" type="range" value="15" />
+                        <div class="flex justify-between mt-4 text-sm font-bold text-slate-400">
+                            <span>0 hrs</span>
+                            <span class="text-primary bg-primary/10 px-3 py-1 rounded-full">15 hrs/week</span>
+                            <span>40+ hrs</span>
+                        </div>
+                    </div>
+                </section>
+                <!-- 6. Projects -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">6</span>
+                        <h3 class="text-xl font-bold">Projects</h3>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">GitHub Profile or
+                        Portfolio Link</label>
+                    <div class="flex">
+                        <span
+                            class="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 text-slate-500 text-sm">
+                            https://
+                        </span>
+                        <input
+                            class="flex-1 rounded-r-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:border-primary focus:ring-primary dark:text-slate-200"
+                            placeholder="github.com/username" type="text" />
+                    </div>
+                </section>
+                <!-- 7. Interviews -->
+                <section class="border-b border-slate-100 dark:border-slate-800 pb-10">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">7</span>
+                        <h3 class="text-xl font-bold">Interviews</h3>
+                    </div>
+                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-4">Biggest Interview
+                        Weakness</label>
+                    <select
+                        class="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 focus:border-primary focus:ring-primary dark:text-slate-200 py-3">
+                        <option disabled="" selected="" value="">Select an area</option>
+                        <option value="system-design">System Design</option>
+                        <option value="behavioral">Behavioral Questions</option>
+                        <option value="coding">Data Structures &amp; Algorithms</option>
+                        <option value="salary">Salary Negotiation</option>
+                        <option value="case-study">Case Studies</option>
+                    </select>
+                </section>
+                <!-- 8. Job Matching -->
+                <section class="pb-4">
+                    <div class="flex items-center gap-3 mb-6">
+                        <span
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">8</span>
+                        <h3 class="text-xl font-bold">Job Matching</h3>
+                    </div>
+                    <label
+                        class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-6 uppercase tracking-wider">Work
+                        Preference</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <label
+                            class="relative flex cursor-pointer items-center justify-center rounded-xl border-2 border-slate-200 dark:border-slate-800 p-4 transition-all hover:border-primary/50 [&amp;:has(input:checked)]:border-primary [&amp;:has(input:checked)]:bg-primary/5">
+                            <input checked="" class="sr-only" name="work_pref" type="radio" />
+                            <div class="flex flex-col items-center gap-2">
+                                <span class="material-symbols-outlined">home_work</span>
+                                <span class="font-bold text-sm">Remote</span>
+                            </div>
+                        </label>
+                        <label
+                            class="relative flex cursor-pointer items-center justify-center rounded-xl border-2 border-slate-200 dark:border-slate-800 p-4 transition-all hover:border-primary/50 [&amp;:has(input:checked)]:border-primary [&amp;:has(input:checked)]:bg-primary/5">
+                            <input class="sr-only" name="work_pref" type="radio" />
+                            <div class="flex flex-col items-center gap-2">
+                                <span class="material-symbols-outlined">domain</span>
+                                <span class="font-bold text-sm">Hybrid</span>
+                            </div>
+                        </label>
+                        <label
+                            class="relative flex cursor-pointer items-center justify-center rounded-xl border-2 border-slate-200 dark:border-slate-800 p-4 transition-all hover:border-primary/50 [&amp;:has(input:checked)]:border-primary [&amp;:has(input:checked)]:bg-primary/5">
+                            <input class="sr-only" name="work_pref" type="radio" />
+                            <div class="flex flex-col items-center gap-2">
+                                <span class="material-symbols-outlined">corporate_fare</span>
+                                <span class="font-bold text-sm">On-site</span>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </main>
+        <!-- Footer -->
+        <footer
+            class="fixed bottom-0 left-0 right-0 z-[60] border-t border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl px-6 py-4">
+            <div class="mx-auto max-w-3xl flex justify-center">
+                <a href="../markhub_onboarding_step_3/code.html"
+                    class="group w-full flex items-center justify-center gap-3 rounded-xl bg-primary px-8 py-4 text-lg font-black text-white shadow-2xl shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                    <span>Generate My Markhub OS</span>
+                    <span
+                        class="material-symbols-outlined transition-transform group-hover:translate-x-1">rocket_launch</span>
+                </a>
+            </div>
+        </footer>
+    </div>
+</body>
+
+</html>
