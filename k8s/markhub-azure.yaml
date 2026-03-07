@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: markhub-backend
+  labels:
+    app: markhub-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: markhub-backend
+  template:
+    metadata:
+      labels:
+        app: markhub-backend
+    spec:
+      containers:
+      - name: backend
+        image: markhub-backend:latest # Replace with Azure Container Registry (ACR) URL
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi" # 4GB RAM max allocation for backend
+            cpu: "1000m"
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://user:password@hostname:5432/dbname" # Configure based on Azure PostgreSQL Flexible Server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: markhub-backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: markhub-backend
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: markhub-frontend
+  labels:
+    app: markhub-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: markhub-frontend
+  template:
+    metadata:
+      labels:
+        app: markhub-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: markhub-frontend:latest # Replace with Azure Container Registry (ACR) URL
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+          limits:
+            memory: "8Gi" # 8GB RAM max allocation for frontend
+            cpu: "2000m"
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://markhub-backend-service:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: markhub-frontend-service
+  annotations:
+    # Use Azure Internal or External Load Balancer depending on need
+    service.beta.kubernetes.io/azure-load-balancer-internal: "false" 
+spec:
+  type: LoadBalancer
+  selector:
+    app: markhub-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
