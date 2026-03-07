@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Markhub AI Mock Interview</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f4f7f6;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        .video-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .video-box {
+            flex: 1;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        h3 {
+            position: absolute;
+            top: 5px;
+            left: 10px;
+            color: white;
+            margin: 0;
+            font-size: 14px;
+            z-index: 10;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        #controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            border: none;
+            color: white;
+            transition: background-color 0.2s;
+        }
+
+        #start-setup {
+            background: #28a745;
+        }
+
+        #record-btn {
+            background: #007bff;
+            display: none;
+        }
+
+        #transcript-box {
+            padding: 15px;
+            border: 1px solid #ccc;
+            height: 350px;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 6px;
+        }
+
+        .log {
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .speaker-Candidate {
+            color: #0056b3;
+        }
+
+        .speaker-Interviewer {
+            color: #d39e00;
+        }
+
+        /* Report Styles */
+        .report-card {
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 6px;
+            color: #856404;
+        }
+
+        .report-card h4 {
+            margin-top: 0;
+            border-bottom: 1px solid #ffeeba;
+            padding-bottom: 10px;
+        }
+
+        .score {
+            font-size: 18px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Markhub: Technical Interview Room</h2>
+
+    <div id="controls">
+        <button id="start-setup">1. Enable Camera & Screen</button>
+        <button id="record-btn">2. Hold to Answer</button>
+    </div>
+
+    <div class="video-container">
+        <div class="video-box">
+            <h3>Your Camera</h3>
+            <video id="webcam-preview" autoplay muted playsinline></video>
+        </div>
+        <div class="video-box">
+            <h3>Your Screen</h3>
+            <video id="screen-preview" autoplay muted playsinline></video>
+        </div>
+    </div>
+
+    <div id="transcript-box">
+        <div class="log" style="color: gray;"><em>System: Awaiting connection...</em></div>
+    </div>
+    <audio id="audio-player" autoplay></audio>
+
+    <script>
+        const ws = new WebSocket("ws://127.0.0.1:8080/ws/interview");
+        ws.binaryType = "arraybuffer";
+
+        const startSetupBtn = document.getElementById("start-setup");
+        const recordBtn = document.getElementById("record-btn");
+        const transcriptBox = document.getElementById("transcript-box");
+        const audioPlayer = document.getElementById("audio-player");
+        const webcamPreview = document.getElementById("webcam-preview");
+        const screenPreview = document.getElementById("screen-preview");
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        ws.onopen = () => transcriptBox.innerHTML += `<div class="log" style="color: green;"><em>System: Connected to AI Interviewer.</em></div>`;
+        ws.onclose = () => transcriptBox.innerHTML += `<div class="log" style="color: orange;"><em>System: Disconnected.</em></div>`;
+
+        ws.onmessage = (event) => {
+            if (typeof event.data === "string") {
+                const data = JSON.parse(event.data);
+
+                if (data.type === "analysis") {
+                    renderAnalysisReport(data.payload);
+                } else {
+                    const speakerClass = `speaker-${data.speaker}`;
+                    transcriptBox.innerHTML += `<div class="log"><strong class="${speakerClass}">${data.speaker}:</strong> ${data.text}</div>`;
+                    transcriptBox.scrollTop = transcriptBox.scrollHeight;
+                }
+            } else {
+                // FORCE AUDIO PLAYBACK
+                const audioBlob = new Blob([event.data], { type: "audio/mp3" });
+                audioPlayer.src = URL.createObjectURL(audioBlob);
+
+                // Explicitly tell the browser to play it, and log an error if it refuses
+                audioPlayer.play().catch(err => {
+                    console.error("Browser blocked the AI voice from playing:", err);
+                    transcriptBox.innerHTML += `<div class="log" style="color: red;"><em>System: Browser blocked audio. Click anywhere on the page to allow sound.</em></div>`;
+                });
+            }
+        };
+
+        function renderAnalysisReport(payload) {
+            recordBtn.style.display = "none"; // Hide record button
+
+            const reportHtml = `
+                <div class="report-card">
+                    <h4>Final Performance Report</h4>
+                    <p class="score">Technical Score: ${payload.technical_score}/10</p>
+                    <p class="score">Communication Score: ${payload.communication_score}/10</p>
+                    <p><strong>Strengths:</strong></p>
+                    <ul>${payload.strengths.map(s => `<li>${s}</li>`).join('')}</ul>
+                    <p><strong>Critical Weaknesses:</strong></p>
+                    <ul>${payload.critical_weaknesses.map(w => `<li>${w}</li>`).join('')}</ul>
+                    <p><strong>Study Roadmap:</strong></p>
+                    <ul>${payload.study_roadmap.map(r => `<li>${r}</li>`).join('')}</ul>
+                </div>
+            `;
+            transcriptBox.innerHTML += reportHtml;
+            transcriptBox.scrollTop = transcriptBox.scrollHeight;
+        }
+
+        startSetupBtn.onclick = async () => {
+            try {
+                const webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                webcamPreview.srcObject = webcamStream;
+                const audioStream = new MediaStream(webcamStream.getAudioTracks());
+
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                screenPreview.srcObject = screenStream;
+
+                let options = { mimeType: 'audio/webm;codecs=opus' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : { mimeType: 'audio/mp4' };
+                }
+
+                mediaRecorder = new MediaRecorder(audioStream, options);
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    if (ws.readyState === WebSocket.OPEN) ws.send(new Blob(audioChunks, { type: options.mimeType }));
+                    audioChunks = [];
+                };
+
+                startSetupBtn.style.display = "none";
+                recordBtn.style.display = "inline-block";
+            } catch (err) { alert("Permissions denied. Cannot proceed."); }
+        };
+
+        // Fully Fix Button Visuals
+        recordBtn.onmousedown = () => {
+            if (mediaRecorder && mediaRecorder.state === "inactive") {
+                mediaRecorder.start();
+                recordBtn.textContent = "Recording... Release to Send";
+                recordBtn.style.backgroundColor = "#dc3545"; // Red
+            }
+        };
+
+        recordBtn.onmouseup = () => {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                recordBtn.textContent = "Processing... Wait";
+                recordBtn.style.backgroundColor = "#6c757d"; // Gray
+
+                setTimeout(() => {
+                    recordBtn.textContent = "Hold to Answer";
+                    recordBtn.style.backgroundColor = "#007bff"; // Blue
+                }, 2000);
+            }
+        };
+
+        recordBtn.onmouseleave = () => {
+            if (mediaRecorder && mediaRecorder.state === "recording") recordBtn.onmouseup();
+        };
+    </script>
+</body>
+
+</html>
