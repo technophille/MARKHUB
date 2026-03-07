@@ -1,6 +1,32 @@
+"use client";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 
 export default function OnboardingStep3() {
+    const [currentStep, setCurrentStep] = useState(0);
+    const [insightsCount, setInsightsCount] = useState<number | string>("...");
+
+    useEffect(() => {
+        // Read dynamic count from Step 2
+        const storedCount = localStorage.getItem("extractedInsightsCount");
+        if (storedCount) {
+            setInsightsCount(parseInt(storedCount, 10));
+        } else {
+            setInsightsCount(42); // Fallback
+        }
+
+        if (currentStep < 4) {
+            const timer = setTimeout(() => {
+                setCurrentStep(prev => prev + 1);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [currentStep]);
+
+    const isCompleted = (index: number) => currentStep > index;
+    const isActive = (index: number) => currentStep === index;
+    const isPending = (index: number) => currentStep < index;
+
     return (
         <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
             <div className="layout-container flex h-full grow flex-col">
@@ -25,10 +51,10 @@ export default function OnboardingStep3() {
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-sm font-semibold text-primary">Step 3 of 3</span>
-                                <span className="text-sm font-medium text-slate-500">100%</span>
+                                <span className="text-sm font-medium text-slate-500">{currentStep === 4 ? "100%" : `${currentStep * 25}%`}</span>
                             </div>
                             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                                <div className="bg-primary h-full w-full rounded-full transition-all duration-1000"></div>
+                                <div className={`bg-primary h-full rounded-full transition-all duration-1000`} style={{ width: `${currentStep === 4 ? 100 : currentStep * 25}%` }}></div>
                             </div>
                             <p className="mt-3 text-sm text-slate-500 text-center">Finalizing your professional ecosystem...</p>
                         </div>
@@ -46,43 +72,68 @@ export default function OnboardingStep3() {
                             </div>
 
                             <div className="w-full max-w-md space-y-4 text-left">
-                                <div className="flex items-center gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10">
-                                    <span className="material-symbols-outlined text-green-500">check_circle</span>
+                                {/* Step 1: Analyzing Resume & Portfolio */}
+                                <div className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-500 ease-in-out ${isCompleted(0) ? "bg-primary/5 border-primary/10 border" : isActive(0) ? "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 border" : "bg-slate-50/50 dark:bg-slate-800/30 border-transparent border opacity-50"}`}>
+                                    {isCompleted(0) && <span className="material-symbols-outlined text-green-500">check_circle</span>}
+                                    {isActive(0) && <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>}
+                                    {isPending(0) && <span className="material-symbols-outlined text-slate-300 dark:text-slate-600">pending</span>}
                                     <div className="flex-1">
-                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Analyzing Resume & Portfolio</p>
-                                        <p className="text-xs text-slate-500">Extraction complete: 42 key insights identified</p>
+                                        <p className={`text-sm font-semibold ${isPending(0) ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}`}>Analyzing Resume & Portfolio</p>
+                                        <p className={`text-xs ${isPending(0) ? "text-slate-400 dark:text-slate-600" : "text-slate-500"}`}>
+                                            {isCompleted(0) ? `Extraction complete: ${insightsCount} key insights identified` : "Extracting data from documents..."}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10">
-                                    <span className="material-symbols-outlined text-green-500">check_circle</span>
+
+                                {/* Step 2: Mapping Skills Graph */}
+                                <div className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-500 ease-in-out ${isCompleted(1) ? "bg-primary/5 border-primary/10 border" : isActive(1) ? "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 border" : "bg-slate-50/50 dark:bg-slate-800/30 border-transparent border opacity-50"}`}>
+                                    {isCompleted(1) && <span className="material-symbols-outlined text-green-500">check_circle</span>}
+                                    {isActive(1) && <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>}
+                                    {isPending(1) && <span className="material-symbols-outlined text-slate-300 dark:text-slate-600">pending</span>}
                                     <div className="flex-1">
-                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Mapping Skills Graph</p>
-                                        <p className="text-xs text-slate-500">Market alignment: 94% match for Senior roles</p>
+                                        <p className={`text-sm font-semibold ${isPending(1) ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}`}>Mapping Skills Graph</p>
+                                        <p className={`text-xs ${isPending(1) ? "text-slate-400 dark:text-slate-600" : "text-slate-500"}`}>
+                                            {isCompleted(1) ? "Market alignment: 94% match for Senior roles" : "Analyzing skill taxonomy..."}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                                    <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
+
+                                {/* Step 3: Verifying Past Projects */}
+                                <div className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-500 ease-in-out ${isCompleted(2) ? "bg-primary/5 border-primary/10 border" : isActive(2) ? "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 border" : "bg-slate-50/50 dark:bg-slate-800/30 border-transparent border opacity-50"}`}>
+                                    {isCompleted(2) && <span className="material-symbols-outlined text-green-500">check_circle</span>}
+                                    {isActive(2) && <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>}
+                                    {isPending(2) && <span className="material-symbols-outlined text-slate-300 dark:text-slate-600">pending</span>}
                                     <div className="flex-1">
-                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Verifying Past Projects</p>
-                                        <p className="text-xs text-slate-500">Quantifying impact and technical stack relevance...</p>
+                                        <p className={`text-sm font-semibold ${isPending(2) ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}`}>Verifying Past Projects</p>
+                                        <p className={`text-xs ${isPending(2) ? "text-slate-400 dark:text-slate-600" : "text-slate-500"}`}>
+                                            {isCompleted(2) ? "Project complexities scored successfully" : "Quantifying impact and technical stack relevance..."}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/30 border border-transparent">
-                                    <span className="material-symbols-outlined text-slate-300 dark:text-slate-600">pending</span>
+
+                                {/* Step 4: Optimizing Roadmap */}
+                                <div className={`flex items-center gap-4 p-4 rounded-xl transition-all duration-500 ease-in-out ${isCompleted(3) ? "bg-primary/5 border-primary/10 border" : isActive(3) ? "bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 border" : "bg-slate-50/50 dark:bg-slate-800/30 border-transparent border opacity-50"}`}>
+                                    {isCompleted(3) && <span className="material-symbols-outlined text-green-500">check_circle</span>}
+                                    {isActive(3) && <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>}
+                                    {isPending(3) && <span className="material-symbols-outlined text-slate-300 dark:text-slate-600">pending</span>}
                                     <div className="flex-1">
-                                        <p className="text-sm font-semibold text-slate-400 dark:text-slate-500">Optimizing Roadmap</p>
-                                        <p className="text-xs text-slate-400 dark:text-slate-600">Waiting for data synthesis...</p>
+                                        <p className={`text-sm font-semibold ${isPending(3) ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-200"}`}>Optimizing Roadmap</p>
+                                        <p className={`text-xs ${isPending(3) ? "text-slate-400 dark:text-slate-600" : "text-slate-500"}`}>
+                                            {isCompleted(3) ? "Roadmap generation complete" : "Waiting for data synthesis..."}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center gap-4">
-                            <Link href="/discovery" className="w-full max-w-sm bg-primary text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-2 shadow-lg hover:bg-primary/90 transition-all">
-                                <span>View Your DNA Report</span>
-                                <span className="material-symbols-outlined">arrow_forward</span>
+                        {/* Hide this section until currentStep reaches 4 */}
+                        <div className={`p-8 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center gap-4 transition-all duration-1000 ${currentStep === 4 ? "opacity-100 max-h-40" : "opacity-0 max-h-0 overflow-hidden py-0"}`}>
+                            <Link href="/discovery" className="w-full max-w-sm bg-primary text-white font-bold py-4 px-8 rounded-xl flex flex-col items-center justify-center shadow-lg hover:bg-primary/90 transition-all hover:scale-105 active:scale-95">
+                                <div className="flex items-center gap-2">
+                                    <span>View Your DNA Report</span>
+                                    <span className="material-symbols-outlined">arrow_forward</span>
+                                </div>
                             </Link>
-                            <p className="text-xs text-slate-400 italic">This usually takes less than 30 seconds</p>
                         </div>
                     </div>
                 </main>

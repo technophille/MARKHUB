@@ -1,65 +1,67 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TopHeader } from "@/components/layout/TopHeader";
 
-const simulations = [
-    {
-        id: "ai-engineer",
-        title: "AI Engineer Simulation",
-        icon: "smart_toy",
-        color: "from-violet-500 to-purple-600",
-        difficulty: "Intermediate",
-        duration: "45 min",
-        task: "Predict Customer Churn",
-        description: "You are given a dataset of 10,000 customers with features like tenure, monthly charges, and contract type. Build and evaluate a model to predict customer churn.",
-        steps: [
-            { name: "Load & Explore Dataset", status: "complete" },
-            { name: "Clean & Preprocess Data", status: "complete" },
-            { name: "Feature Engineering", status: "active" },
-            { name: "Train ML Model", status: "locked" },
-            { name: "Evaluate Accuracy", status: "locked" },
-            { name: "Submit Results", status: "locked" },
-        ],
-    },
-    {
-        id: "product-manager",
-        title: "Product Manager Simulation",
-        icon: "inventory_2",
-        color: "from-amber-500 to-orange-500",
-        difficulty: "Beginner",
-        duration: "30 min",
-        task: "Feature Proposal for Declining Engagement",
-        description: "App engagement dropped 15% this quarter. Analyze user feedback data, identify top pain points, and write a feature proposal to reverse the trend.",
-        steps: [
-            { name: "Analyze Feedback Data", status: "locked" },
-            { name: "Identify Pain Points", status: "locked" },
-            { name: "Write Feature Proposal", status: "locked" },
-            { name: "Present to Stakeholders", status: "locked" },
-        ],
-    },
-    {
-        id: "developer",
-        title: "Full Stack Developer Simulation",
-        icon: "code",
-        color: "from-emerald-500 to-teal-500",
-        difficulty: "Intermediate",
-        duration: "60 min",
-        task: "Fix & Extend Login API",
-        description: "The login API has a critical bug causing 500 errors. Debug the issue, fix it, then add JWT refresh token support.",
-        steps: [
-            { name: "Read Bug Report", status: "locked" },
-            { name: "Reproduce Error", status: "locked" },
-            { name: "Debug Root Cause", status: "locked" },
-            { name: "Apply Fix & Test", status: "locked" },
-            { name: "Add Refresh Token", status: "locked" },
-        ],
-    },
-];
+interface Exercise {
+    title: string;
+    company: string;
+    url: string;
+    duration: string;
+    difficulty: string;
+    icon: string;
+    color: string;
+    description: string;
+}
+
+interface SimData {
+    target_role: string;
+    exercises: Exercise[];
+}
 
 export default function SimulationPage() {
-    const [activeSimIndex, setActiveSimIndex] = useState(0);
-    const activeSim = simulations[activeSimIndex];
+    const [data, setData] = useState<SimData | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const userId = localStorage.getItem("markhub_user_id") || "2";
+        const selectedRole = localStorage.getItem("markhub_selected_role");
+        const roleParam = selectedRole ? `?role=${encodeURIComponent(selectedRole)}` : "";
+        fetch(`http://localhost:8000/api/simulation/${userId}${roleParam}`)
+            .then(res => res.json())
+            .then(result => {
+                if (result.status === "success") {
+                    setData(result);
+                }
+            })
+            .catch(err => console.error("Failed to fetch simulations:", err))
+            .finally(() => setLoading(false));
+    }, []);
+
+    if (loading) {
+        return (
+            <>
+                <TopHeader title="Career Simulation (Stage 5)" />
+                <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                        <p className="text-slate-500 font-semibold">Loading virtual experiences...</p>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    if (!data || !data.exercises || data.exercises.length === 0) {
+        return (
+            <>
+                <TopHeader title="Career Simulation (Stage 5)" />
+                <div className="flex-1 flex items-center justify-center p-8">
+                    <p className="text-slate-500">No simulations available. Complete the Career Calibration first.</p>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -70,69 +72,66 @@ export default function SimulationPage() {
                         <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-900 dark:text-white">
                             Experience The Job <span className="text-primary">Before</span> You Get It
                         </h1>
-                        <p className="text-slate-500 dark:text-slate-400 text-base">Real-world simulations that test your skills in actual job scenarios. Complete them to boost your readiness score.</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-base">
+                            Real-world virtual experiences from <strong>Forage</strong>, curated for <strong>{data.target_role}</strong>. Complete these to build resume-worthy experience.
+                        </p>
                     </div>
 
-                    {/* Simulation Selector */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {simulations.map((sim, i) => (
-                            <button
-                                key={sim.id}
-                                onClick={() => setActiveSimIndex(i)}
-                                className={`p-4 rounded-xl border-2 text-left transition-all ${i === activeSimIndex
-                                        ? "border-primary bg-primary/5 shadow-lg"
-                                        : "border-slate-200 dark:border-slate-800 hover:border-primary/50"
-                                    }`}
-                            >
-                                <div className={`h-10 w-10 rounded-lg bg-gradient-to-br ${sim.color} flex items-center justify-center text-white mb-3`}>
-                                    <span className="material-symbols-outlined text-xl">{sim.icon}</span>
+                    {/* Forage Badge */}
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl p-5 text-white flex items-center gap-4 shadow-lg">
+                        <span className="material-symbols-outlined text-4xl">workspace_premium</span>
+                        <div>
+                            <h3 className="font-bold text-lg">Powered by Forage Virtual Experiences</h3>
+                            <p className="text-sm opacity-90">Industry-designed simulations from top companies. Earn certificates upon completion.</p>
+                        </div>
+                    </div>
+
+                    {/* Exercise Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {data.exercises.map((exercise, i) => (
+                            <div key={i} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1">
+                                <div className={`bg-gradient-to-r ${exercise.color} p-5 text-white`}>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="h-11 w-11 rounded-lg bg-white/20 flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-xl">{exercise.icon}</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h4 className="font-bold text-base leading-snug">{exercise.title}</h4>
+                                            <p className="text-xs opacity-80">by {exercise.company}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded">{exercise.difficulty}</span>
+                                        <span className="text-[10px] opacity-80">⏱ {exercise.duration}</span>
+                                    </div>
                                 </div>
-                                <h4 className="font-bold text-sm text-slate-800 dark:text-white">{sim.title}</h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{sim.difficulty}</span>
-                                    <span className="text-[10px] text-slate-400">{sim.duration}</span>
+
+                                <div className="p-5 flex flex-col gap-4">
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">{exercise.description}</p>
+                                    <a
+                                        href={exercise.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary text-white font-bold text-sm rounded-lg hover:bg-blue-700 transition"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">open_in_new</span>
+                                        Start on Forage →
+                                    </a>
                                 </div>
-                            </button>
+                            </div>
                         ))}
                     </div>
 
-                    {/* Active Simulation Detail */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                        <div className={`bg-gradient-to-r ${activeSim.color} p-6 text-white`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <span className="material-symbols-outlined text-3xl">{activeSim.icon}</span>
-                                <div>
-                                    <h3 className="text-xl font-black">{activeSim.title}</h3>
-                                    <p className="text-sm opacity-80">Task: {activeSim.task}</p>
-                                </div>
-                            </div>
-                            <p className="text-sm opacity-90 leading-relaxed mt-3">{activeSim.description}</p>
-                        </div>
-
-                        <div className="p-6">
-                            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-4 uppercase tracking-wider">Simulation Steps</h4>
-                            <div className="space-y-3">
-                                {activeSim.steps.map((step, i) => (
-                                    <div key={i} className={`flex items-center gap-4 p-3 rounded-lg ${step.status === "complete" ? "bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20" :
-                                            step.status === "active" ? "bg-primary/5 border-2 border-primary" :
-                                                "bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 opacity-60"
-                                        }`}>
-                                        {step.status === "complete" ? (
-                                            <span className="material-symbols-outlined text-emerald-500">check_circle</span>
-                                        ) : step.status === "active" ? (
-                                            <div className="h-5 w-5 rounded-full border-2 border-primary border-t-transparent animate-spin"></div>
-                                        ) : (
-                                            <span className="material-symbols-outlined text-slate-300">lock</span>
-                                        )}
-                                        <span className={`text-sm font-semibold ${step.status === "active" ? "text-primary" : "text-slate-700 dark:text-slate-300"}`}>{step.name}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <button className="mt-6 w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                                <span className="material-symbols-outlined">play_arrow</span>
-                                {activeSimIndex === 0 ? "Continue Simulation" : "Start Simulation"}
-                            </button>
+                    {/* Info callout */}
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-800 p-4 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-primary text-2xl mt-0.5">info</span>
+                        <div>
+                            <p className="text-sm font-bold text-slate-800 dark:text-white">Why Forage?</p>
+                            <p className="text-xs text-slate-500 leading-relaxed mt-1">
+                                Forage virtual work experience programs are designed by top employers like JPMorgan, BCG, and Mastercard.
+                                They&apos;re free, self-paced, and provide real-world tasks that mirror actual job responsibilities.
+                                Completing them earns you verifiable certificates to strengthen your resume.
+                            </p>
                         </div>
                     </div>
 

@@ -1,6 +1,55 @@
+"use client";
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function OnboardingStep1() {
+    const router = useRouter();
+    const [isLoginMode, setIsLoginMode] = useState(true);
+    const [username, setUsername] = useState("admin");
+    const [password, setPassword] = useState("admin");
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMsg, setErrorMsg] = useState("");
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setErrorMsg("");
+        setIsLoading(true);
+
+        try {
+            const endpoint = isLoginMode ? "/api/auth/login" : "/api/auth/signup";
+            const formData = new FormData();
+            formData.append("username", username);
+            formData.append("password", password);
+
+            const res = await fetch(`http://localhost:8000${endpoint}`, {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = await res.json();
+            if (data.status === "success") {
+                // Store user_id for profile fetching
+                localStorage.setItem("markhub_user_id", data.user_id.toString());
+
+                // New users (signup or login with no profile) go to Step 2
+                // Existing users with profile data skip to Step 3
+                if (!isLoginMode || data.is_new) {
+                    router.push("/onboarding/step2");
+                } else {
+                    router.push("/onboarding/step3");
+                }
+            } else {
+                setErrorMsg(data.message || "Authentication failed");
+            }
+        } catch (err) {
+            setErrorMsg("Network error. Is the backend running?");
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
             <div className="layout-container flex h-full grow flex-col">
@@ -56,22 +105,69 @@ export default function OnboardingStep1() {
 
                                 <div className="flex flex-col gap-3">
                                     <h1 className="text-slate-900 dark:text-slate-100 text-3xl lg:text-4xl font-extrabold tracking-tight">
-                                        Welcome to Markhub AI
+                                        {isLoginMode ? "Welcome Back to Markhub" : "Join Markhub AI"}
                                     </h1>
-                                    <p className="text-slate-600 dark:text-slate-400 text-lg max-w-md mx-auto leading-relaxed">
+                                    <p className="text-slate-600 dark:text-slate-400 text-lg max-w-md mx-auto leading-relaxed mb-6">
                                         Let's build your professional identity with the world's first AI Career OS.
                                     </p>
-                                </div>
 
-                                <div className="w-full flex flex-col gap-4">
-                                    <Link
-                                        href="/onboarding/step2"
-                                        className="w-full py-4 px-8 bg-primary hover:bg-primary/90 text-white font-bold text-lg rounded-full transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group"
-                                    >
-                                        Begin Calibration
-                                        <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
-                                    </Link>
-                                    <p className="text-slate-400 text-xs">Estimated time: 2 minutes</p>
+                                    <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto flex flex-col gap-4 text-left">
+                                        {errorMsg && (
+                                            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm mb-2 text-center">
+                                                {errorMsg}
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Username</label>
+                                            <input
+                                                required
+                                                type="text"
+                                                value={username}
+                                                onChange={(e) => setUsername(e.target.value)}
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all dark:text-white"
+                                                placeholder="Enter username"
+                                            />
+                                        </div>
+
+                                        <div className="flex flex-col gap-1.5">
+                                            <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Password</label>
+                                            <input
+                                                required
+                                                type="password"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all dark:text-white"
+                                                placeholder="Enter password"
+                                            />
+                                        </div>
+
+                                        <button
+                                            type="submit"
+                                            disabled={isLoading}
+                                            className="mt-4 w-full py-4 px-8 bg-primary hover:bg-primary/90 text-white font-bold text-lg rounded-full transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group disabled:opacity-70 disabled:cursor-not-allowed"
+                                        >
+                                            {isLoading ? (
+                                                <div className="h-5 w-5 rounded-full border-2 border-white border-t-transparent animate-spin"></div>
+                                            ) : (
+                                                <>
+                                                    {isLoginMode ? "Login to Dashboard" : "Create Account"}
+                                                    <span className="material-symbols-outlined transition-transform group-hover:translate-x-1">arrow_forward</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </form>
+
+                                    <div className="text-sm text-slate-500 mt-2">
+                                        {isLoginMode ? "Don't have an account?" : "Already have an account?"}
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsLoginMode(!isLoginMode)}
+                                            className="ml-2 font-bold text-primary hover:underline hover:text-primary/80"
+                                        >
+                                            {isLoginMode ? "Sign Up" : "Log In"}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
