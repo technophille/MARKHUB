@@ -2,7 +2,7 @@
 MARKHUB Backend — FastAPI + PostgreSQL
 Handles user profile creation from the Career Calibration form.
 """
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 import psycopg2.extras
@@ -12,7 +12,16 @@ import shutil
 from typing import Optional
 import PyPDF2
 import re
-from passlib.context import CryptContext
+import tempfile
+import traceback
+from groq import Groq
+import edge_tts
+
+# --- Groq AI Client for Interview ---
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
+groq_client = Groq(api_key=GROQ_API_KEY)
+
+INTERVIEW_MAX_TURNS = 5
 
 app = FastAPI(title="Markhub AI Backend", version="1.0.0")
 
@@ -34,13 +43,22 @@ DB_CONFIG = {
     "port": 5432,
 }
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
+import hashlib
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    if isinstance(plain_password, str): plain_password = plain_password.encode('utf-8')
+    pre_hashed = hashlib.sha256(plain_password).digest()
+    if isinstance(hashed_password, str): hashed_password = hashed_password.encode('utf-8')
+    try:
+        return bcrypt.checkpw(pre_hashed, hashed_password)
+    except Exception:
+        return False
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    if isinstance(password, str): password = password.encode('utf-8')
+    pre_hashed = hashlib.sha256(password).digest()
+    return bcrypt.hashpw(pre_hashed, bcrypt.gensalt()).decode('utf-8')
 
 # --- AI Skills Extraction Logic ---
 MASTER_SKILLS_LIST = [
@@ -218,6 +236,14 @@ ROLE_CATALOG = {
     "Game Developer":          {"skills": ["c++", "c#", "python", "git", "unity", "unreal engine", "3d math", "physics"], "salary": "8–20 LPA", "icon": "sports_esports", "color": "from-purple-500 to-violet-600"},
     "Solutions Architect":     {"skills": ["aws", "azure", "docker", "kubernetes", "networking", "security", "python", "sql", "terraform", "rest apis"], "salary": "20–40 LPA", "icon": "architecture", "color": "from-slate-500 to-gray-600"},
     "Technical Writer":        {"skills": ["git", "html", "css", "python", "rest apis", "markdown"], "salary": "5–12 LPA", "icon": "edit_note", "color": "from-stone-500 to-zinc-600"},
+    "Product Manager":         {"skills": ["sql", "excel", "python", "agile", "scrum", "figma", "data science", "rest apis"], "salary": "15–35 LPA", "icon": "inventory_2", "color": "from-indigo-400 to-violet-500"},
+    "UX Designer":             {"skills": ["figma", "html", "css", "javascript", "react", "git"], "salary": "8–22 LPA", "icon": "palette", "color": "from-pink-400 to-fuchsia-500"},
+    "Platform Engineer":       {"skills": ["docker", "kubernetes", "terraform", "aws", "gcp", "linux", "python", "ci/cd", "git", "github actions", "bash"], "salary": "18–35 LPA", "icon": "layers", "color": "from-cyan-400 to-blue-500"},
+    "Embedded Systems Engineer": {"skills": ["c++", "python", "linux", "git", "bash", "networking"], "salary": "10–22 LPA", "icon": "memory", "color": "from-gray-500 to-slate-600"},
+    "NLP Engineer":            {"skills": ["python", "nlp", "machine learning", "deep learning", "tensorflow", "pytorch", "docker", "git", "sql"], "salary": "16–35 LPA", "icon": "chat", "color": "from-emerald-400 to-teal-500"},
+    "Computer Vision Engineer": {"skills": ["python", "computer vision", "deep learning", "tensorflow", "pytorch", "docker", "linux", "git"], "salary": "16–35 LPA", "icon": "visibility", "color": "from-blue-400 to-indigo-500"},
+    "Database Administrator":  {"skills": ["sql", "postgresql", "mongodb", "redis", "linux", "python", "docker", "bash"], "salary": "10–25 LPA", "icon": "database", "color": "from-amber-400 to-yellow-500"},
+    "Security Engineer":       {"skills": ["python", "linux", "networking", "security", "docker", "kubernetes", "bash", "aws", "terraform"], "salary": "15–30 LPA", "icon": "vpn_lock", "color": "from-red-400 to-orange-500"},
 }
 
 # Backward-compat alias for the profile endpoint
@@ -251,17 +277,9 @@ def get_career_recommendations(user_id: int):
         target_roles = row[2] or []
         user_skills_lower = set(s.lower() for s in known_skills + extracted_cv_skills)
 
-        # Filter ROLE_CATALOG by user's target roles if they selected any
-        if target_roles:
-            roles_to_show = {k: v for k, v in ROLE_CATALOG.items() if k in target_roles}
-            # If none matched (typo etc), fall back to all
-            if not roles_to_show:
-                roles_to_show = ROLE_CATALOG
-        else:
-            roles_to_show = ROLE_CATALOG
-
+        # Show ALL roles, ranked by match %. User's target_roles get a boost indicator.
         recommendations = []
-        for role_name, meta in roles_to_show.items():
+        for role_name, meta in ROLE_CATALOG.items():
             required = meta["skills"]
             matched = [s for s in required if s in user_skills_lower]
             match_pct = round((len(matched) / max(len(required), 1)) * 100)
@@ -278,6 +296,7 @@ def get_career_recommendations(user_id: int):
                 "missing_skills": missing,
                 "total_required": len(required),
                 "total_matched": len(matched),
+                "is_target": role_name in target_roles,
             })
 
         recommendations.sort(key=lambda x: (-x["match"], x["title"]))
@@ -704,55 +723,170 @@ ROLE_PROJECTS = {
         {"title": "Real-Time Chat Application", "difficulty": "Intermediate", "tags": ["React", "Socket.io", "Node.js", "MongoDB"], "description": "Create a real-time messaging app with rooms, typing indicators, and message history using WebSockets.", "github_url": "https://github.com/topics/chat-application"},
         {"title": "Project Management Tool", "difficulty": "Advanced", "tags": ["Next.js", "TypeScript", "PostgreSQL", "REST APIs"], "description": "Build a Trello-like kanban board with drag-and-drop, user auth, project collaboration, and real-time updates.", "github_url": "https://github.com/topics/project-management"},
         {"title": "Personal Blog with CMS", "difficulty": "Intermediate", "tags": ["Next.js", "MDX", "Tailwind", "Vercel"], "description": "Create a production-ready blog with markdown editor, categories, SEO, and deployment to Vercel.", "github_url": "https://github.com/topics/blog-platform"},
+        {"title": "Social Media Platform", "difficulty": "Advanced", "tags": ["React", "Node.js", "MongoDB", "Redis", "AWS S3"], "description": "Build a mini social network with user profiles, posts, likes, comments, followers, image uploads, and a news feed algorithm.", "github_url": "https://github.com/topics/social-network"},
+        {"title": "Job Board Application", "difficulty": "Intermediate", "tags": ["Next.js", "PostgreSQL", "Prisma", "Tailwind"], "description": "Build a job listing platform with employer/candidate roles, resume upload, job search with filters, and application tracking.", "github_url": "https://github.com/topics/job-board"},
     ],
     "Frontend Developer": [
         {"title": "Weather Dashboard", "difficulty": "Beginner", "tags": ["React", "CSS", "API", "Charts.js"], "description": "Build an interactive weather dashboard with 7-day forecasts, location search, and animated weather icons.", "github_url": "https://github.com/topics/weather-app"},
         {"title": "Portfolio Website", "difficulty": "Beginner", "tags": ["HTML", "CSS", "JavaScript", "GSAP"], "description": "Design and build a professional portfolio with animations, project showcase, and contact form.", "github_url": "https://github.com/topics/portfolio-website"},
         {"title": "Social Media Dashboard", "difficulty": "Intermediate", "tags": ["React", "TypeScript", "Tailwind", "Chart.js"], "description": "Build a metrics dashboard with real-time stats, interactive charts, dark mode, and responsive design.", "github_url": "https://github.com/topics/dashboard"},
+        {"title": "Music Player UI", "difficulty": "Intermediate", "tags": ["React", "CSS Animations", "Web Audio API"], "description": "Build a Spotify-like music player with playlist management, audio visualizer, and smooth transitions.", "github_url": "https://github.com/topics/music-player"},
+        {"title": "Design System Component Library", "difficulty": "Advanced", "tags": ["React", "Storybook", "TypeScript", "CSS"], "description": "Create a reusable UI component library with 20+ components, documentation in Storybook, and npm publishing.", "github_url": "https://github.com/topics/component-library"},
     ],
     "Backend Developer": [
         {"title": "REST API with Auth System", "difficulty": "Intermediate", "tags": ["Python", "FastAPI", "PostgreSQL", "JWT"], "description": "Build a production-ready REST API with JWT authentication, role-based access, rate limiting, and API documentation.", "github_url": "https://github.com/topics/rest-api"},
         {"title": "URL Shortener Service", "difficulty": "Beginner", "tags": ["Node.js", "Redis", "Docker", "Nginx"], "description": "Create a URL shortener with analytics tracking, custom slugs, and rate limiting.", "github_url": "https://github.com/topics/url-shortener"},
         {"title": "Microservices Architecture", "difficulty": "Advanced", "tags": ["Docker", "Kubernetes", "gRPC", "PostgreSQL"], "description": "Design a microservices-based system with service discovery, API gateway, and inter-service communication.", "github_url": "https://github.com/topics/microservices"},
+        {"title": "GraphQL API Server", "difficulty": "Intermediate", "tags": ["Node.js", "GraphQL", "Apollo", "PostgreSQL"], "description": "Build a GraphQL API with queries, mutations, subscriptions, dataloader for N+1 prevention, and Playground documentation.", "github_url": "https://github.com/topics/graphql-api"},
+        {"title": "Task Queue System", "difficulty": "Advanced", "tags": ["Python", "Celery", "Redis", "Docker"], "description": "Build an async task processing system with priority queues, retries, dead letter handling, and a monitoring dashboard.", "github_url": "https://github.com/topics/task-queue"},
     ],
     "Data Scientist": [
         {"title": "Customer Churn Prediction", "difficulty": "Intermediate", "tags": ["Python", "Pandas", "Scikit-learn", "Matplotlib"], "description": "Analyze telecom customer data, engineer features, and build a classification model to predict churn.", "github_url": "https://github.com/topics/churn-prediction"},
         {"title": "Sentiment Analysis Dashboard", "difficulty": "Intermediate", "tags": ["Python", "NLP", "Streamlit", "NLTK"], "description": "Build a dashboard that analyzes sentiment from Twitter/Reddit data with real-time visualizations.", "github_url": "https://github.com/topics/sentiment-analysis"},
         {"title": "Movie Recommendation System", "difficulty": "Intermediate", "tags": ["Python", "Scikit-learn", "Pandas", "Cosine Similarity"], "description": "Build a content-based and collaborative filtering recommendation engine on 5000+ movies.", "github_url": "https://github.com/topics/recommendation-system"},
         {"title": "A/B Testing Framework", "difficulty": "Advanced", "tags": ["Python", "Statistics", "SQL", "Streamlit"], "description": "Build a statistical A/B testing framework with power analysis, hypothesis testing, and result visualization.", "github_url": "https://github.com/topics/ab-testing"},
+        {"title": "Housing Price Predictor", "difficulty": "Beginner", "tags": ["Python", "Pandas", "XGBoost", "Flask"], "description": "Predict housing prices using regression models with feature engineering, cross-validation, and a simple web app for predictions.", "github_url": "https://github.com/topics/house-price-prediction"},
+        {"title": "Customer Segmentation Engine", "difficulty": "Intermediate", "tags": ["Python", "K-Means", "PCA", "Plotly"], "description": "Segment e-commerce customers using clustering algorithms, dimensionality reduction, and interactive 3D visualizations.", "github_url": "https://github.com/topics/customer-segmentation"},
     ],
     "ML Engineer": [
         {"title": "Image Classification Pipeline", "difficulty": "Advanced", "tags": ["Python", "PyTorch", "Docker", "FastAPI"], "description": "Train an image classifier, package it with Docker, and serve predictions via a REST API.", "github_url": "https://github.com/topics/image-classification"},
         {"title": "MLOps Pipeline", "difficulty": "Advanced", "tags": ["MLflow", "Docker", "Airflow", "AWS"], "description": "Build an end-to-end ML pipeline with model versioning, automated training, and deployment.", "github_url": "https://github.com/topics/mlops"},
         {"title": "Stock Price Predictor", "difficulty": "Intermediate", "tags": ["Python", "TensorFlow", "LSTM", "yfinance"], "description": "Predict stock prices using LSTM neural networks with historical data.", "github_url": "https://github.com/topics/stock-prediction"},
+        {"title": "Model A/B Testing Platform", "difficulty": "Advanced", "tags": ["Python", "FastAPI", "Redis", "Prometheus"], "description": "Build a platform for A/B testing ML models in production with traffic splitting, metric tracking, and automatic rollback.", "github_url": "https://github.com/topics/model-serving"},
+        {"title": "AutoML Framework", "difficulty": "Advanced", "tags": ["Python", "Scikit-learn", "Optuna", "Streamlit"], "description": "Build an automated ML pipeline that selects models, tunes hyperparameters, and generates performance reports.", "github_url": "https://github.com/topics/automl"},
     ],
     "AI Engineer": [
         {"title": "AI Chatbot with RAG", "difficulty": "Advanced", "tags": ["LangChain", "ChromaDB", "OpenAI", "FastAPI"], "description": "Build a retrieval-augmented chatbot that answers questions from uploaded documents.", "github_url": "https://github.com/topics/rag"},
         {"title": "Object Detection System", "difficulty": "Advanced", "tags": ["Python", "YOLO", "OpenCV", "Streamlit"], "description": "Build a real-time object detection system using YOLO with a web interface for image/video upload.", "github_url": "https://github.com/topics/object-detection"},
         {"title": "Text Summarizer", "difficulty": "Intermediate", "tags": ["Python", "Transformers", "Hugging Face", "FastAPI"], "description": "Build an abstractive text summarizer using pre-trained transformer models with a web API.", "github_url": "https://github.com/topics/text-summarization"},
+        {"title": "AI Code Review Assistant", "difficulty": "Advanced", "tags": ["Python", "LLMs", "FastAPI", "GitHub API"], "description": "Build an AI assistant that reviews code pull requests, detects bugs, suggests improvements, and generates summaries.", "github_url": "https://github.com/topics/code-review"},
+        {"title": "Voice Assistant", "difficulty": "Intermediate", "tags": ["Python", "Whisper", "TTS", "FastAPI"], "description": "Build a voice assistant that transcribes speech, processes commands with NLP, and responds with text-to-speech.", "github_url": "https://github.com/topics/voice-assistant"},
     ],
     "DevOps Engineer": [
         {"title": "CI/CD Pipeline Builder", "difficulty": "Intermediate", "tags": ["GitHub Actions", "Docker", "Terraform", "AWS"], "description": "Build automated CI/CD pipelines for a web app with testing, building, and multi-env deployment.", "github_url": "https://github.com/topics/cicd-pipeline"},
         {"title": "Infrastructure as Code", "difficulty": "Advanced", "tags": ["Terraform", "AWS", "Ansible", "Monitoring"], "description": "Provision cloud infrastructure with Terraform, configure with Ansible, and set up monitoring.", "github_url": "https://github.com/topics/infrastructure-as-code"},
         {"title": "Kubernetes Cluster Setup", "difficulty": "Advanced", "tags": ["Kubernetes", "Helm", "Prometheus", "Grafana"], "description": "Deploy a multi-service application on Kubernetes with monitoring, auto-scaling, and logging.", "github_url": "https://github.com/topics/kubernetes-deployment"},
+        {"title": "Log Aggregation Platform", "difficulty": "Intermediate", "tags": ["ELK Stack", "Docker", "Filebeat", "Kibana"], "description": "Set up centralized logging with Elasticsearch, Logstash, Kibana, and automated alerting for error patterns.", "github_url": "https://github.com/topics/elk-stack"},
+        {"title": "GitOps Workflow", "difficulty": "Advanced", "tags": ["ArgoCD", "Kubernetes", "Helm", "Git"], "description": "Implement GitOps with ArgoCD for automated Kubernetes deployments triggered by Git commits.", "github_url": "https://github.com/topics/gitops"},
     ],
     "Cybersecurity Analyst": [
         {"title": "Network Security Scanner", "difficulty": "Intermediate", "tags": ["Python", "Scapy", "Nmap", "Linux"], "description": "Build a Python-based network scanner that detects open ports, services, and vulnerabilities.", "github_url": "https://github.com/topics/network-scanner"},
         {"title": "Password Manager", "difficulty": "Intermediate", "tags": ["Python", "Encryption", "SQLite", "CLI"], "description": "Build a secure password manager with AES encryption, master password auth, and password generation.", "github_url": "https://github.com/topics/password-manager"},
         {"title": "Log Analyzer & SIEM Dashboard", "difficulty": "Advanced", "tags": ["Python", "ELK Stack", "Linux", "Docker"], "description": "Build a security log analyzer with pattern detection, alerting, and visualization dashboard.", "github_url": "https://github.com/topics/siem"},
+        {"title": "Web App Vulnerability Scanner", "difficulty": "Advanced", "tags": ["Python", "Requests", "BeautifulSoup", "OWASP"], "description": "Build an automated scanner that detects XSS, SQL injection, CSRF, and other OWASP Top 10 vulnerabilities.", "github_url": "https://github.com/topics/vulnerability-scanner"},
     ],
     "Cloud Architect": [
         {"title": "Serverless Web App", "difficulty": "Intermediate", "tags": ["AWS Lambda", "API Gateway", "DynamoDB", "S3"], "description": "Build a serverless web application using AWS services with authentication and file storage.", "github_url": "https://github.com/topics/serverless"},
         {"title": "Multi-Cloud Deployment", "difficulty": "Advanced", "tags": ["Terraform", "AWS", "GCP", "Docker"], "description": "Deploy the same application across AWS and GCP using Terraform with load balancing.", "github_url": "https://github.com/topics/multi-cloud"},
+        {"title": "Cloud Cost Optimization Tool", "difficulty": "Advanced", "tags": ["Python", "AWS SDK", "React", "PostgreSQL"], "description": "Build a dashboard that analyzes cloud spending, identifies waste, and recommends cost-saving measures.", "github_url": "https://github.com/topics/cloud-cost"},
+        {"title": "Disaster Recovery Setup", "difficulty": "Advanced", "tags": ["AWS", "Terraform", "S3", "RDS"], "description": "Design and implement a disaster recovery architecture with automated failover, backup, and recovery testing.", "github_url": "https://github.com/topics/disaster-recovery"},
     ],
     "Blockchain Developer": [
         {"title": "DeFi Token & Exchange", "difficulty": "Advanced", "tags": ["Solidity", "Hardhat", "React", "Ethers.js"], "description": "Create an ERC-20 token and build a decentralized exchange with liquidity pools.", "github_url": "https://github.com/topics/defi"},
         {"title": "NFT Marketplace", "difficulty": "Advanced", "tags": ["Solidity", "IPFS", "React", "Web3.js"], "description": "Build an NFT marketplace where users can mint, list, and trade NFTs.", "github_url": "https://github.com/topics/nft-marketplace"},
         {"title": "Smart Contract Wallet", "difficulty": "Intermediate", "tags": ["Solidity", "Hardhat", "TypeScript"], "description": "Build a multi-sig smart contract wallet with approval workflows.", "github_url": "https://github.com/topics/smart-contracts"},
+        {"title": "DAO Governance Platform", "difficulty": "Advanced", "tags": ["Solidity", "React", "The Graph", "IPFS"], "description": "Build a decentralized governance platform with proposal creation, voting, and on-chain execution.", "github_url": "https://github.com/topics/dao"},
     ],
     "Mobile Developer": [
         {"title": "Fitness Tracker App", "difficulty": "Intermediate", "tags": ["React Native", "Firebase", "Charts", "AsyncStorage"], "description": "Build a fitness tracking app with workout logging, progress charts, and goal setting.", "github_url": "https://github.com/topics/fitness-app"},
         {"title": "Food Delivery UI Clone", "difficulty": "Intermediate", "tags": ["React Native", "Maps API", "Firebase"], "description": "Clone a food delivery app UI with restaurant listings, maps, cart, and order tracking.", "github_url": "https://github.com/topics/food-delivery"},
+        {"title": "Expense Tracker", "difficulty": "Beginner", "tags": ["React Native", "SQLite", "Charts", "Notifications"], "description": "Build an expense tracking app with categories, budgets, monthly reports, and daily spending alerts.", "github_url": "https://github.com/topics/expense-tracker"},
+        {"title": "Social Photo App", "difficulty": "Advanced", "tags": ["React Native", "Firebase", "Camera API", "Cloud Functions"], "description": "Build an Instagram-like photo sharing app with filters, stories, likes, comments, and push notifications.", "github_url": "https://github.com/topics/photo-sharing"},
+    ],
+    "Data Analyst": [
+        {"title": "Sales Analytics Dashboard", "difficulty": "Beginner", "tags": ["Python", "Pandas", "Plotly", "Streamlit"], "description": "Build an interactive sales dashboard analyzing revenue trends, top products, regional performance, and seasonal patterns.", "github_url": "https://github.com/topics/sales-dashboard"},
+        {"title": "COVID-19 Data Tracker", "difficulty": "Beginner", "tags": ["Python", "Pandas", "Matplotlib", "Folium"], "description": "Analyze and visualize COVID-19 data with time-series charts, geographic heat maps, and vaccination progress.", "github_url": "https://github.com/topics/covid-19-data"},
+        {"title": "Survey Analysis Tool", "difficulty": "Intermediate", "tags": ["Python", "Pandas", "Seaborn", "Excel"], "description": "Build an automated survey analysis pipeline that cleans data, generates cross-tabulations, and creates a PDF report.", "github_url": "https://github.com/topics/survey-analysis"},
+        {"title": "Web Scraping & Analysis Pipeline", "difficulty": "Intermediate", "tags": ["Python", "BeautifulSoup", "SQL", "Tableau"], "description": "Scrape job listing data from multiple sources, clean and store in SQL, then build a Tableau dashboard.", "github_url": "https://github.com/topics/web-scraping"},
+        {"title": "Financial Report Generator", "difficulty": "Intermediate", "tags": ["Python", "Pandas", "Excel", "Power BI"], "description": "Automate quarterly financial report generation with data aggregation, KPI calculations, and formatted Excel output.", "github_url": "https://github.com/topics/financial-analysis"},
+    ],
+    "Data Engineer": [
+        {"title": "ETL Pipeline with Airflow", "difficulty": "Advanced", "tags": ["Python", "Airflow", "PostgreSQL", "Docker"], "description": "Build an automated ETL pipeline that extracts data from APIs, transforms it, and loads into a data warehouse.", "github_url": "https://github.com/topics/etl-pipeline"},
+        {"title": "Real-Time Streaming Pipeline", "difficulty": "Advanced", "tags": ["Kafka", "Spark Streaming", "PostgreSQL", "Docker"], "description": "Build a real-time data streaming pipeline processing 10K+ events/sec with Kafka and Spark.", "github_url": "https://github.com/topics/data-streaming"},
+        {"title": "Data Lake on AWS", "difficulty": "Advanced", "tags": ["AWS S3", "Glue", "Athena", "Terraform"], "description": "Design and deploy a data lake architecture on AWS with partitioned storage, schema management, and SQL querying.", "github_url": "https://github.com/topics/data-lake"},
+        {"title": "CDC Pipeline", "difficulty": "Intermediate", "tags": ["Debezium", "Kafka", "PostgreSQL", "Docker"], "description": "Implement Change Data Capture to sync database changes in real-time across multiple downstream systems.", "github_url": "https://github.com/topics/change-data-capture"},
+        {"title": "Data Quality Framework", "difficulty": "Intermediate", "tags": ["Python", "Great Expectations", "Airflow", "SQL"], "description": "Build a data quality monitoring system with automated validation rules, alerting, and data lineage tracking.", "github_url": "https://github.com/topics/data-quality"},
+    ],
+    "Site Reliability Engineer": [
+        {"title": "Service Health Dashboard", "difficulty": "Intermediate", "tags": ["Go", "Prometheus", "Grafana", "Docker"], "description": "Build a real-time service health monitoring dashboard with SLO tracking, incident alerts, and error budget calculations.", "github_url": "https://github.com/topics/monitoring-dashboard"},
+        {"title": "Chaos Engineering Toolkit", "difficulty": "Advanced", "tags": ["Python", "Kubernetes", "Litmus", "Docker"], "description": "Build a chaos engineering framework that injects failures (network, disk, CPU) and measures system resilience.", "github_url": "https://github.com/topics/chaos-engineering"},
+        {"title": "Automated Incident Response", "difficulty": "Advanced", "tags": ["Python", "PagerDuty", "Slack API", "Terraform"], "description": "Build an automated incident response system with runbook automation, escalation, and post-mortem generation.", "github_url": "https://github.com/topics/incident-response"},
+        {"title": "Load Testing Framework", "difficulty": "Intermediate", "tags": ["Python", "Locust", "Docker", "Grafana"], "description": "Build a load testing framework that simulates thousands of users and generates performance reports.", "github_url": "https://github.com/topics/load-testing"},
+    ],
+    "QA / Test Automation": [
+        {"title": "E2E Test Framework", "difficulty": "Intermediate", "tags": ["Cypress", "JavaScript", "GitHub Actions", "Docker"], "description": "Build a comprehensive end-to-end testing framework with page objects, visual regression, and CI integration.", "github_url": "https://github.com/topics/e2e-testing"},
+        {"title": "API Test Suite", "difficulty": "Beginner", "tags": ["Python", "Pytest", "Requests", "Docker"], "description": "Build an automated API test suite with data-driven tests, schema validation, and HTML reports.", "github_url": "https://github.com/topics/api-testing"},
+        {"title": "Performance Testing Pipeline", "difficulty": "Intermediate", "tags": ["JMeter", "Grafana", "Docker", "Jenkins"], "description": "Build automated performance tests with JMeter, real-time monitoring in Grafana, and CI/CD integration.", "github_url": "https://github.com/topics/performance-testing"},
+        {"title": "Mobile Test Automation", "difficulty": "Advanced", "tags": ["Appium", "Python", "Jenkins", "BrowserStack"], "description": "Build a mobile testing framework for iOS/Android with Appium, parallel execution, and cloud device farms.", "github_url": "https://github.com/topics/appium"},
+    ],
+    "Game Developer": [
+        {"title": "2D Platformer Game", "difficulty": "Intermediate", "tags": ["Unity", "C#", "Sprite Animation", "Physics"], "description": "Build a Mario-style platformer with level design, enemy AI, power-ups, and a scoring system.", "github_url": "https://github.com/topics/platformer-game"},
+        {"title": "Multiplayer Card Game", "difficulty": "Advanced", "tags": ["Unity", "C#", "Photon", "UI Design"], "description": "Build an online multiplayer card game (like UNO) with matchmaking, real-time sync, and animations.", "github_url": "https://github.com/topics/card-game"},
+        {"title": "3D FPS Shooter", "difficulty": "Advanced", "tags": ["Unreal Engine", "C++", "Blueprints", "Networking"], "description": "Build a first-person shooter with AI enemies, weapon systems, destructible environments, and multiplayer.", "github_url": "https://github.com/topics/fps-game"},
+        {"title": "Puzzle Game", "difficulty": "Beginner", "tags": ["Python", "Pygame", "UI Design", "Algorithms"], "description": "Build a puzzle game (Sudoku, 2048, or match-3) with procedural generation and local leaderboard.", "github_url": "https://github.com/topics/puzzle-game"},
+    ],
+    "Solutions Architect": [
+        {"title": "Architecture Decision Records", "difficulty": "Intermediate", "tags": ["Markdown", "Git", "Diagrams", "Documentation"], "description": "Create a comprehensive ADR system with templates, decision tracking, and automated diagram generation.", "github_url": "https://github.com/topics/architecture-decision-records"},
+        {"title": "Cloud Migration Planner", "difficulty": "Advanced", "tags": ["Python", "AWS", "Terraform", "React"], "description": "Build a tool that analyzes on-prem infrastructure and generates a cloud migration plan with cost estimates.", "github_url": "https://github.com/topics/cloud-migration"},
+        {"title": "System Design Documentation Tool", "difficulty": "Intermediate", "tags": ["React", "Mermaid.js", "Markdown", "Docker"], "description": "Build a visual system design tool with drag-and-drop architecture diagrams and auto-generated documentation.", "github_url": "https://github.com/topics/system-design"},
+        {"title": "API Gateway & Service Mesh", "difficulty": "Advanced", "tags": ["Kong", "Istio", "Kubernetes", "Docker"], "description": "Design and implement an API gateway with rate limiting, auth, and a service mesh for microservices communication.", "github_url": "https://github.com/topics/api-gateway"},
+    ],
+    "Technical Writer": [
+        {"title": "Developer Documentation Site", "difficulty": "Beginner", "tags": ["Docusaurus", "Markdown", "React", "Git"], "description": "Build a professional developer documentation site with search, versioning, and API reference pages.", "github_url": "https://github.com/topics/documentation"},
+        {"title": "API Documentation Generator", "difficulty": "Intermediate", "tags": ["OpenAPI", "Swagger", "Python", "Redoc"], "description": "Build an automated API documentation system from OpenAPI specs with interactive try-it-out functionality.", "github_url": "https://github.com/topics/api-documentation"},
+        {"title": "Technical Blog Platform", "difficulty": "Intermediate", "tags": ["Next.js", "MDX", "Tailwind", "Vercel"], "description": "Build a technical blog with code syntax highlighting, LaTeX rendering, diagram support, and RSS feed.", "github_url": "https://github.com/topics/technical-blog"},
+        {"title": "Knowledge Base System", "difficulty": "Intermediate", "tags": ["React", "Algolia", "Markdown", "Node.js"], "description": "Build a searchable knowledge base with categories, full-text search, analytics, and user feedback.", "github_url": "https://github.com/topics/knowledge-base"},
+    ],
+    "Product Manager": [
+        {"title": "Feature Prioritization Tool", "difficulty": "Intermediate", "tags": ["React", "Node.js", "PostgreSQL", "D3.js"], "description": "Build a RICE/MoSCoW prioritization tool with scoring matrices, stakeholder voting, and roadmap visualization.", "github_url": "https://github.com/topics/product-management"},
+        {"title": "User Feedback Analytics", "difficulty": "Intermediate", "tags": ["Python", "NLP", "Streamlit", "SQL"], "description": "Build a tool that collects user feedback, categorizes it with NLP, and generates actionable insights.", "github_url": "https://github.com/topics/user-feedback"},
+        {"title": "OKR Tracking Dashboard", "difficulty": "Intermediate", "tags": ["React", "Node.js", "PostgreSQL", "Chart.js"], "description": "Build an OKR tracking tool with goal setting, progress visualization, team alignment, and weekly check-ins.", "github_url": "https://github.com/topics/okr"},
+        {"title": "Competitive Analysis Dashboard", "difficulty": "Beginner", "tags": ["Python", "BeautifulSoup", "Pandas", "Streamlit"], "description": "Build a competitive intelligence dashboard that tracks competitor features, pricing, and market positioning.", "github_url": "https://github.com/topics/competitive-analysis"},
+    ],
+    "UX Designer": [
+        {"title": "Design System in Figma + Code", "difficulty": "Intermediate", "tags": ["Figma", "React", "CSS", "Storybook"], "description": "Design a complete design system in Figma, then implement it as a React component library with Storybook docs.", "github_url": "https://github.com/topics/design-system"},
+        {"title": "Usability Testing Platform", "difficulty": "Intermediate", "tags": ["React", "Node.js", "Recording API", "Firebase"], "description": "Build a usability testing platform with task recording, heat maps, and automated UX metric calculations.", "github_url": "https://github.com/topics/usability-testing"},
+        {"title": "Accessibility Audit Tool", "difficulty": "Intermediate", "tags": ["JavaScript", "Axe-core", "React", "Node.js"], "description": "Build an accessibility checker that scans web pages for WCAG compliance and generates fix recommendations.", "github_url": "https://github.com/topics/accessibility"},
+        {"title": "Interactive Prototype Builder", "difficulty": "Advanced", "tags": ["React", "Canvas API", "TypeScript", "IndexedDB"], "description": "Build a browser-based prototype builder with clickable hotspots, screen transitions, and sharing.", "github_url": "https://github.com/topics/prototype"},
+    ],
+    "Platform Engineer": [
+        {"title": "Internal Developer Platform", "difficulty": "Advanced", "tags": ["Backstage", "Kubernetes", "Terraform", "React"], "description": "Build an IDP with service catalog, environment provisioning, and developer self-service workflows.", "github_url": "https://github.com/topics/developer-platform"},
+        {"title": "Self-Service CI/CD", "difficulty": "Advanced", "tags": ["ArgoCD", "Kubernetes", "GitHub Actions", "Helm"], "description": "Build a self-service CI/CD platform where teams can deploy apps without DevOps help, with guardrails.", "github_url": "https://github.com/topics/platform-engineering"},
+        {"title": "Container Registry", "difficulty": "Intermediate", "tags": ["Docker", "Harbor", "Terraform", "Kubernetes"], "description": "Deploy and manage a private container registry with vulnerability scanning and image signing.", "github_url": "https://github.com/topics/container-registry"},
+        {"title": "Secrets Management System", "difficulty": "Intermediate", "tags": ["HashiCorp Vault", "Kubernetes", "Terraform", "Python"], "description": "Deploy and integrate a secrets management system with automatic rotation and audit logging.", "github_url": "https://github.com/topics/secrets-management"},
+    ],
+    "Embedded Systems Engineer": [
+        {"title": "IoT Weather Station", "difficulty": "Beginner", "tags": ["Arduino", "C++", "MQTT", "Node.js"], "description": "Build a weather station with temperature, humidity, and pressure sensors that publishes data to a web dashboard.", "github_url": "https://github.com/topics/iot-weather"},
+        {"title": "Smart Home Controller", "difficulty": "Intermediate", "tags": ["Raspberry Pi", "Python", "MQTT", "React"], "description": "Build a smart home system controlling lights, fans, and sensors with a mobile-friendly web interface.", "github_url": "https://github.com/topics/smart-home"},
+        {"title": "RTOS Task Scheduler", "difficulty": "Advanced", "tags": ["C", "FreeRTOS", "ARM", "Debugging"], "description": "Implement a real-time task scheduler on an ARM microcontroller with priority-based scheduling and interrupt handling.", "github_url": "https://github.com/topics/rtos"},
+        {"title": "GPS Tracker Device", "difficulty": "Intermediate", "tags": ["Arduino", "GPS Module", "GSM", "Google Maps"], "description": "Build a GPS tracker that logs location data and displays routes on Google Maps via a web interface.", "github_url": "https://github.com/topics/gps-tracker"},
+    ],
+    "NLP Engineer": [
+        {"title": "Named Entity Recognition System", "difficulty": "Intermediate", "tags": ["Python", "spaCy", "Transformers", "FastAPI"], "description": "Build a custom NER system that extracts entities from text with a web API and confidence scores.", "github_url": "https://github.com/topics/named-entity-recognition"},
+        {"title": "Document Q&A System", "difficulty": "Advanced", "tags": ["LangChain", "FAISS", "Transformers", "Streamlit"], "description": "Build a document question-answering system that indexes PDFs and answers questions using semantic search.", "github_url": "https://github.com/topics/question-answering"},
+        {"title": "Language Translation API", "difficulty": "Intermediate", "tags": ["Python", "MarianMT", "FastAPI", "Docker"], "description": "Build a multi-language translation service using open-source transformer models with batch processing.", "github_url": "https://github.com/topics/machine-translation"},
+        {"title": "Text Classification Pipeline", "difficulty": "Beginner", "tags": ["Python", "Scikit-learn", "BERT", "Flask"], "description": "Build a text classification system for spam detection, topic categorization, and intent recognition.", "github_url": "https://github.com/topics/text-classification"},
+        {"title": "Chatbot with Intent Recognition", "difficulty": "Intermediate", "tags": ["Rasa", "Python", "NLU", "Docker"], "description": "Build an intelligent chatbot with intent recognition, entity extraction, and multi-turn conversation management.", "github_url": "https://github.com/topics/chatbot"},
+    ],
+    "Computer Vision Engineer": [
+        {"title": "Face Recognition System", "difficulty": "Intermediate", "tags": ["Python", "OpenCV", "dlib", "Flask"], "description": "Build a face recognition system with enrollment, verification, and real-time webcam detection.", "github_url": "https://github.com/topics/face-recognition"},
+        {"title": "Autonomous Lane Detection", "difficulty": "Advanced", "tags": ["Python", "OpenCV", "Deep Learning", "CARLA"], "description": "Build a lane detection system for autonomous driving using computer vision and deep learning on the CARLA simulator.", "github_url": "https://github.com/topics/lane-detection"},
+        {"title": "Medical Image Segmentation", "difficulty": "Advanced", "tags": ["Python", "PyTorch", "U-Net", "DICOM"], "description": "Build a medical image segmentation model (X-ray/CT) using U-Net architecture with evaluation metrics.", "github_url": "https://github.com/topics/medical-imaging"},
+        {"title": "Document OCR Pipeline", "difficulty": "Intermediate", "tags": ["Python", "Tesseract", "OpenCV", "FastAPI"], "description": "Build an OCR pipeline that extracts text from scanned documents with pre-processing and layout analysis.", "github_url": "https://github.com/topics/ocr"},
+        {"title": "Pose Estimation App", "difficulty": "Intermediate", "tags": ["Python", "MediaPipe", "OpenCV", "Streamlit"], "description": "Build a real-time human pose estimation app for fitness tracking with rep counting and form correction.", "github_url": "https://github.com/topics/pose-estimation"},
+    ],
+    "Database Administrator": [
+        {"title": "Database Performance Monitor", "difficulty": "Intermediate", "tags": ["Python", "PostgreSQL", "Grafana", "Docker"], "description": "Build a monitoring tool that tracks query performance, identifies slow queries, and suggests index optimizations.", "github_url": "https://github.com/topics/database-monitoring"},
+        {"title": "Automated Backup System", "difficulty": "Intermediate", "tags": ["Bash", "PostgreSQL", "AWS S3", "Cron"], "description": "Build an automated database backup system with encryption, compression, S3 upload, and restoration testing.", "github_url": "https://github.com/topics/database-backup"},
+        {"title": "Schema Migration Tool", "difficulty": "Advanced", "tags": ["Python", "Alembic", "PostgreSQL", "Docker"], "description": "Build a database schema migration tool with rollback support, dry-run mode, and migration dependency tracking.", "github_url": "https://github.com/topics/database-migration"},
+        {"title": "Database Comparison Tool", "difficulty": "Intermediate", "tags": ["Python", "SQL", "React", "PostgreSQL"], "description": "Build a tool that compares schemas across environments, detects drift, and generates sync scripts.", "github_url": "https://github.com/topics/database-tools"},
+    ],
+    "Security Engineer": [
+        {"title": "SAST/DAST Scanner", "difficulty": "Advanced", "tags": ["Python", "Docker", "OWASP", "GitHub Actions"], "description": "Build a security scanning pipeline that performs static and dynamic analysis of code and running applications.", "github_url": "https://github.com/topics/security-scanning"},
+        {"title": "Identity & Access Management", "difficulty": "Advanced", "tags": ["Keycloak", "OAuth2", "Docker", "React"], "description": "Deploy and customize an IAM solution with SSO, MFA, role-based access, and audit logging.", "github_url": "https://github.com/topics/iam"},
+        {"title": "Container Security Platform", "difficulty": "Advanced", "tags": ["Trivy", "Docker", "Kubernetes", "Python"], "description": "Build a container security platform that scans images for vulnerabilities and enforces security policies.", "github_url": "https://github.com/topics/container-security"},
+        {"title": "Encryption Key Management", "difficulty": "Intermediate", "tags": ["Python", "Cryptography", "REST API", "Docker"], "description": "Build a key management service with key rotation, envelope encryption, and audit trails.", "github_url": "https://github.com/topics/key-management"},
+        {"title": "Phishing Detection System", "difficulty": "Intermediate", "tags": ["Python", "ML", "Flask", "Email Parsing"], "description": "Build a system that analyzes emails for phishing indicators using ML classification and URL analysis.", "github_url": "https://github.com/topics/phishing-detection"},
     ],
 }
 
@@ -820,6 +954,213 @@ def get_project_recommendations(user_id: int, role: str = None):
         projects = ROLE_PROJECTS.get(best_role, ROLE_PROJECTS.get("Full Stack Engineer", []))
 
         return {"status": "success", "target_role": best_role, "projects": projects}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        cur.close()
+        conn.close()
+
+# --- Project Upload & Verification ---
+import zipfile
+import io
+import os
+
+LANGUAGE_EXTENSIONS = {
+    ".py": "Python", ".js": "JavaScript", ".ts": "TypeScript", ".tsx": "TypeScript (React)",
+    ".jsx": "JavaScript (React)", ".java": "Java", ".cpp": "C++", ".c": "C", ".cs": "C#",
+    ".go": "Go", ".rs": "Rust", ".rb": "Ruby", ".php": "PHP", ".swift": "Swift",
+    ".kt": "Kotlin", ".sol": "Solidity", ".html": "HTML", ".css": "CSS", ".scss": "SCSS",
+    ".sql": "SQL", ".sh": "Shell", ".yml": "YAML", ".yaml": "YAML", ".json": "JSON",
+    ".md": "Markdown", ".r": "R", ".ipynb": "Jupyter Notebook",
+}
+
+@app.post("/api/projects/upload/{user_id}")
+async def upload_project(user_id: int, file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+
+        if not file.filename.endswith(".zip"):
+            return {"status": "error", "message": "Please upload a .zip file"}
+
+        if len(contents) > 50 * 1024 * 1024:  # 50 MB limit
+            return {"status": "error", "message": "File too large. Max 50 MB."}
+
+        zf = zipfile.ZipFile(io.BytesIO(contents))
+        file_list = zf.namelist()
+
+        # Analyze project structure
+        total_files = len([f for f in file_list if not f.endswith("/")])
+        total_dirs = len([f for f in file_list if f.endswith("/")])
+
+        # Detect languages
+        detected_languages = set()
+        file_type_counts = {}
+        for f in file_list:
+            ext = os.path.splitext(f)[1].lower()
+            if ext in LANGUAGE_EXTENSIONS:
+                lang = LANGUAGE_EXTENSIONS[ext]
+                detected_languages.add(lang)
+                file_type_counts[lang] = file_type_counts.get(lang, 0) + 1
+
+        # Quality checklist
+        has_readme = any(f.lower().endswith("readme.md") or f.lower() == "readme" for f in file_list)
+        has_gitignore = any(f.endswith(".gitignore") for f in file_list)
+        has_package_json = any(f.endswith("package.json") for f in file_list)
+        has_requirements = any(f.endswith("requirements.txt") or f.endswith("Pipfile") or f.endswith("pyproject.toml") for f in file_list)
+        has_dockerfile = any(f.lower().endswith("dockerfile") or f.lower().endswith("docker-compose.yml") for f in file_list)
+        has_tests = any("test" in f.lower() or "spec" in f.lower() for f in file_list)
+        has_ci = any(".github/workflows" in f or "Jenkinsfile" in f or ".gitlab-ci.yml" in f for f in file_list)
+        has_license = any(f.lower() == "license" or f.lower() == "license.md" or f.lower() == "license.txt" for f in file_list)
+        has_env_example = any(f.endswith(".env.example") or f.endswith(".env.sample") for f in file_list)
+
+        # Calculate quality score
+        checklist = [
+            {"name": "README.md", "passed": has_readme, "weight": 20, "tip": "Add a README.md with project overview, setup instructions, and screenshots."},
+            {"name": "Dependency Management", "passed": has_package_json or has_requirements, "weight": 15, "tip": "Include package.json or requirements.txt for reproducible builds."},
+            {"name": "Tests", "passed": has_tests, "weight": 20, "tip": "Add unit/integration tests to demonstrate code quality."},
+            {"name": ".gitignore", "passed": has_gitignore, "weight": 5, "tip": "Add a .gitignore to exclude node_modules, __pycache__, etc."},
+            {"name": "Docker Support", "passed": has_dockerfile, "weight": 10, "tip": "Add Dockerfile for containerized deployment."},
+            {"name": "CI/CD Pipeline", "passed": has_ci, "weight": 10, "tip": "Add GitHub Actions or CI config for automated testing."},
+            {"name": "License", "passed": has_license, "weight": 5, "tip": "Add a LICENSE file (MIT, Apache 2.0, etc.)."},
+            {"name": "Environment Config", "passed": has_env_example, "weight": 5, "tip": "Add .env.example to document required environment variables."},
+            {"name": "File Organization", "passed": total_dirs >= 2, "weight": 10, "tip": "Organize code into directories (src/, tests/, docs/, etc.)."},
+        ]
+
+        quality_score = sum(c["weight"] for c in checklist if c["passed"])
+
+        # Grade
+        if quality_score >= 85:
+            grade = "A"
+        elif quality_score >= 70:
+            grade = "B"
+        elif quality_score >= 55:
+            grade = "C"
+        elif quality_score >= 40:
+            grade = "D"
+        else:
+            grade = "F"
+
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "total_files": total_files,
+            "total_dirs": total_dirs,
+            "detected_languages": sorted(detected_languages),
+            "file_type_counts": file_type_counts,
+            "quality_score": quality_score,
+            "grade": grade,
+            "checklist": checklist,
+        }
+    except zipfile.BadZipFile:
+        return {"status": "error", "message": "Invalid ZIP file. Please upload a valid .zip archive."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# --- Job Matching with Platform Links ---
+JOB_PLATFORMS = [
+    {
+        "platform": "LinkedIn Jobs",
+        "logo": "🔗",
+        "base_url": "https://www.linkedin.com/jobs/search/",
+        "color": "from-blue-600 to-blue-800",
+        "description": "World's largest professional network with millions of job postings.",
+    },
+    {
+        "platform": "Indeed",
+        "logo": "📋",
+        "base_url": "https://www.indeed.com/jobs",
+        "color": "from-indigo-500 to-blue-600",
+        "description": "Largest job search engine with aggregated listings worldwide.",
+    },
+    {
+        "platform": "Glassdoor",
+        "logo": "🏢",
+        "base_url": "https://www.glassdoor.co.in/Job/",
+        "color": "from-green-500 to-emerald-600",
+        "description": "Job listings with company reviews, salaries, and interview insights.",
+    },
+    {
+        "platform": "Naukri.com",
+        "logo": "💼",
+        "base_url": "https://www.naukri.com/",
+        "color": "from-blue-500 to-cyan-600",
+        "description": "India's #1 job portal with lakhs of tech job listings.",
+    },
+    {
+        "platform": "Internshala",
+        "logo": "🎓",
+        "base_url": "https://internshala.com/internships/",
+        "color": "from-sky-400 to-blue-500",
+        "description": "India's largest internship platform. Great for freshers and students.",
+    },
+    {
+        "platform": "Wellfound (AngelList)",
+        "logo": "🚀",
+        "base_url": "https://wellfound.com/role/l/",
+        "color": "from-slate-600 to-gray-700",
+        "description": "Startup jobs — apply directly to founders. Equity and remote roles available.",
+    },
+]
+
+@app.get("/api/jobs/{user_id}")
+def get_job_matches(user_id: int):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT known_skills, extracted_cv_skills FROM user_profiles WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        if not row:
+            return {"status": "error", "message": "Profile not found"}
+
+        known_skills = row[0] or []
+        extracted_cv_skills = row[1] or []
+        user_skills_lower = set(s.lower() for s in known_skills + extracted_cv_skills)
+
+        # Find best matching role
+        best_role = "Software Engineer"
+        best_match = -1
+        for role_name, meta in ROLE_CATALOG.items():
+            matched = sum(1 for s in meta["skills"] if s in user_skills_lower)
+            if matched > best_match:
+                best_match = matched
+                best_role = role_name
+
+        # Build search URLs for each platform
+        role_query = best_role.replace(" ", "+").replace("/", "%2F")
+        skills_query = "+".join(list(user_skills_lower)[:5])
+
+        job_links = []
+        for platform in JOB_PLATFORMS:
+            if platform["platform"] == "LinkedIn Jobs":
+                url = f"{platform['base_url']}?keywords={role_query}&location=India&f_TPR=r604800"
+            elif platform["platform"] == "Indeed":
+                url = f"{platform['base_url']}?q={role_query}&l=India&fromage=7"
+            elif platform["platform"] == "Glassdoor":
+                url = f"{platform['base_url']}?sc.keyword={role_query}"
+            elif platform["platform"] == "Naukri.com":
+                url = f"{platform['base_url']}{role_query.replace('+', '-').lower()}-jobs"
+            elif platform["platform"] == "Internshala":
+                url = f"{platform['base_url']}{role_query.replace('+', '-').lower()}-internship"
+            elif platform["platform"] == "Wellfound (AngelList)":
+                url = f"{platform['base_url']}{role_query.replace('+', '-').lower()}/india"
+            else:
+                url = platform["base_url"]
+
+            job_links.append({
+                "platform": platform["platform"],
+                "logo": platform["logo"],
+                "url": url,
+                "color": platform["color"],
+                "description": platform["description"],
+                "search_query": best_role,
+            })
+
+        return {
+            "status": "success",
+            "target_role": best_role,
+            "user_skills": sorted([s.title() if s not in ["aws", "gcp", "sql", "nlp", "ci/cd"] else s.upper() for s in list(user_skills_lower)[:10]]),
+            "job_links": job_links,
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}
     finally:
@@ -950,9 +1291,116 @@ def get_roadmap(user_id: int, role: str = None):
         if phases:
             phases[0]["status"] = "active"
 
-        # Total timeline
+        # Total timeline before padding
         total_hours = sum(p["total_hours"] for p in phases)
         total_weeks = max(1, round(total_hours / max(learning_hours, 1)))
+
+        # --- Ensure minimum 52 weeks by adding supplementary learning phases ---
+        SUPPLEMENTARY_PHASES = [
+            {
+                "title": "Soft Skills & Communication",
+                "skills": [
+                    {"name": "Technical Communication", "hours": 30, "courses": [
+                        {"title": "Business Writing (Coursera)", "url": "https://www.coursera.org/learn/writing-for-business", "hours": 10},
+                        {"title": "Technical Writing (Google)", "url": "https://developers.google.com/tech-writing", "hours": 8},
+                        {"title": "Presentation Skills (Udemy)", "url": "https://www.udemy.com/course/the-complete-presentation-and-public-speaking-course/", "hours": 12},
+                    ]},
+                    {"name": "Leadership & Collaboration", "hours": 25, "courses": [
+                        {"title": "Teamwork Skills (Coursera)", "url": "https://www.coursera.org/learn/teamwork-skills", "hours": 10},
+                        {"title": "Emotional Intelligence (LinkedIn Learning)", "url": "https://www.linkedin.com/learning/developing-your-emotional-intelligence", "hours": 5},
+                        {"title": "Conflict Resolution (Coursera)", "url": "https://www.coursera.org/learn/conflict-resolution", "hours": 10},
+                    ]},
+                ],
+            },
+            {
+                "title": "Portfolio & Personal Branding",
+                "skills": [
+                    {"name": "Portfolio Website", "hours": 30, "courses": [
+                        {"title": "Build a Dev Portfolio (freeCodeCamp)", "url": "https://youtu.be/oC81zZ4lR_M", "hours": 3},
+                        {"title": "GitHub Profile README Guide", "url": "https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-github-profile/customizing-your-profile/managing-your-profile-readme", "hours": 2},
+                        {"title": "Personal Branding for Developers (Udemy)", "url": "https://www.udemy.com/course/personal-branding-for-developers/", "hours": 8},
+                        {"title": "Technical Blog Writing (dev.to)", "url": "https://dev.to/about", "hours": 10},
+                    ]},
+                    {"name": "LinkedIn Optimization", "hours": 15, "courses": [
+                        {"title": "LinkedIn for Job Seekers (LinkedIn Learning)", "url": "https://www.linkedin.com/learning/learning-linkedin-for-students", "hours": 5},
+                        {"title": "Resume Writing Masterclass (Udemy)", "url": "https://www.udemy.com/course/the-complete-resume-masterclass/", "hours": 10},
+                    ]},
+                ],
+            },
+            {
+                "title": "Interview Preparation",
+                "skills": [
+                    {"name": "Data Structures & Algorithms", "hours": 60, "courses": [
+                        {"title": "Neetcode 150 (Free)", "url": "https://neetcode.io/practice", "hours": 30},
+                        {"title": "LeetCode Top Interview Questions", "url": "https://leetcode.com/studyplan/top-interview-150/", "hours": 30},
+                        {"title": "DSA Full Course (Abdul Bari)", "url": "https://youtu.be/0IAPZzGSbME", "hours": 20},
+                    ]},
+                    {"name": "System Design", "hours": 40, "courses": [
+                        {"title": "System Design Primer (GitHub)", "url": "https://github.com/donnemartin/system-design-primer", "hours": 20},
+                        {"title": "Grokking System Design (Educative)", "url": "https://www.educative.io/courses/grokking-modern-system-design-interview-for-engineers-managers", "hours": 20},
+                    ]},
+                    {"name": "Behavioral Interview Prep", "hours": 20, "courses": [
+                        {"title": "STAR Method Guide (Indeed)", "url": "https://www.indeed.com/career-advice/interviewing/how-to-use-the-star-interview-response-technique", "hours": 5},
+                        {"title": "Mock Interview Practice (Pramp)", "url": "https://www.pramp.com/", "hours": 15},
+                    ]},
+                ],
+            },
+            {
+                "title": "Industry Deep-Dive",
+                "skills": [
+                    {"name": "Industry Case Studies", "hours": 30, "courses": [
+                        {"title": "Engineering Blogs Collection", "url": "https://github.com/kilimchoi/engineering-blogs", "hours": 15},
+                        {"title": "Tech Conference Talks (InfoQ)", "url": "https://www.infoq.com/presentations/", "hours": 10},
+                        {"title": "Podcast: Software Engineering Daily", "url": "https://softwareengineeringdaily.com/", "hours": 5},
+                    ]},
+                    {"name": "Trending Technologies", "hours": 25, "courses": [
+                        {"title": "State of JS/CSS Survey", "url": "https://stateofjs.com/", "hours": 5},
+                        {"title": "ThoughtWorks Tech Radar", "url": "https://www.thoughtworks.com/radar", "hours": 5},
+                        {"title": "Hacker News Top Projects", "url": "https://news.ycombinator.com/best", "hours": 15},
+                    ]},
+                ],
+            },
+            {
+                "title": "Open Source Contribution",
+                "skills": [
+                    {"name": "Open Source Workflow", "hours": 30, "courses": [
+                        {"title": "How to Contribute to Open Source (GitHub Guide)", "url": "https://opensource.guide/how-to-contribute/", "hours": 5},
+                        {"title": "First Contributions (Interactive)", "url": "https://github.com/firstcontributions/first-contributions", "hours": 3},
+                        {"title": "Good First Issues Finder", "url": "https://goodfirstissues.com/", "hours": 22},
+                    ]},
+                    {"name": "Community Building", "hours": 20, "courses": [
+                        {"title": "Building Developer Communities", "url": "https://www.developermarketing.io/", "hours": 10},
+                        {"title": "Speaking at Meetups & Conferences", "url": "https://speaking.io/", "hours": 10},
+                    ]},
+                ],
+            },
+        ]
+
+        supp_idx = 0
+        while total_weeks < 52 and supp_idx < len(SUPPLEMENTARY_PHASES):
+            sp = SUPPLEMENTARY_PHASES[supp_idx]
+            phase_hours = sum(sk["hours"] for sk in sp["skills"])
+            phase_weeks = max(1, round(phase_hours / max(learning_hours, 1)))
+
+            phases.append({
+                "phase": len(phases) + 1,
+                "title": sp["title"],
+                "skills": sp["skills"],
+                "total_hours": phase_hours,
+                "weeks": phase_weeks,
+                "status": "locked",
+            })
+
+            total_hours += phase_hours
+            total_weeks = max(1, round(total_hours / max(learning_hours, 1)))
+            supp_idx += 1
+
+        # If still under 52 weeks, stretch final phase
+        if total_weeks < 52:
+            deficit_weeks = 52 - total_weeks
+            total_weeks = 52
+            if phases:
+                phases[-1]["weeks"] += deficit_weeks
 
         # Get certifications
         certs = ROLE_CERTIFICATIONS.get(best_role, ROLE_CERTIFICATIONS.get("Full Stack Engineer", []))
@@ -972,6 +1420,104 @@ def get_roadmap(user_id: int, role: str = None):
         return {"status": "error", "message": str(e)}
     finally:
         cur.close()
+        conn.close()
+
+@app.get("/api/readiness/{user_id}")
+def get_readiness(user_id: int, role: str = None):
+    """
+    Returns the user's overall job readiness score.
+    Calculates dynamic scores based on:
+    - Skills (matched vs required)
+    - AI Mock Interview history
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # 1. Calculate Skill Completion Score
+        cursor.execute("SELECT known_skills, extracted_cv_skills FROM user_profiles WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+        
+        skills_score = 0
+        target_role = "Software Engineer"
+        
+        if row:
+            known_skills = row[0] or []
+            extracted_cv_skills = row[1] or []
+            user_skills_lower = set(s.lower() for s in known_skills + extracted_cv_skills)
+            
+            # Use selected role if provided
+            if role and role in ROLE_CATALOG:
+                target_role = role
+            else:
+                best_match = -1
+                for role_name, meta in ROLE_CATALOG.items():
+                    req = meta["skills"]
+                    match = sum(1 for s in req if s in user_skills_lower)
+                    pct = round((match / max(len(req), 1)) * 100)
+                    if pct > best_match:
+                        best_match = pct
+                        target_role = role_name
+            
+            required_skills = ROLE_CATALOG.get(target_role, list(ROLE_CATALOG.values())[0])["skills"]
+            matched_skills = [s for s in required_skills if s in user_skills_lower]
+            skills_score = round((len(matched_skills) / max(len(required_skills), 1)) * 100)
+            
+        # 2. Fetch Latest Interview Score
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS interview_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                target_role VARCHAR(100),
+                technical_score INTEGER,
+                communication_score INTEGER,
+                confidence_score INTEGER,
+                overall_grade VARCHAR(5),
+                strengths TEXT[],
+                weaknesses TEXT[],
+                study_topics TEXT[],
+                verdict TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute('''
+            SELECT technical_score, communication_score, confidence_score 
+            FROM interview_history 
+            WHERE user_id = %s 
+            ORDER BY created_at DESC LIMIT 1
+        ''', (user_id,))
+        interview_row = cursor.fetchone()
+        
+        interview_score = 40  # default baseline
+        if interview_row:
+            # Average out of 10, convert to percentage
+            avg_score = sum(interview_row) / 3
+            interview_score = round(avg_score * 10)
+            
+        # 3. Compile dimensions
+        dimensions = [
+            {"name": "Skills Completion", "score": skills_score, "weight_val": 0.30, "weight": "30%", "icon": "school", "color": "text-primary"},
+            {"name": "Projects Built", "score": 60, "weight_val": 0.25, "weight": "25%", "icon": "code", "color": "text-emerald-500"},
+            {"name": "Simulations Passed", "score": 80, "weight_val": 0.20, "weight": "20%", "icon": "science", "color": "text-violet-500"},
+            {"name": "Portfolio Quality", "score": 75, "weight_val": 0.15, "weight": "15%", "icon": "folder", "color": "text-amber-500"},
+            {"name": "Mock Interviews", "score": interview_score, "weight_val": 0.10, "weight": "10%", "icon": "mic", "color": "text-rose-500"},
+        ]
+        
+        final_score = sum(d["score"] * d["weight_val"] for d in dimensions)
+        final_score = round(final_score)
+        
+        return {
+            "status": "success",
+            "target_role": target_role,
+            "final_score": final_score,
+            "dimensions": dimensions
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}
+    finally:
+        cursor.close()
         conn.close()
 
 @app.get("/api/profile/{user_id}")
@@ -1217,3 +1763,301 @@ def get_profile(user_id: int):
     if row:
         return {"profile": row}
     return {"error": "Profile not found"}, 404
+
+
+# ==========================================
+# MOCK INTERVIEW — WebSocket + Groq AI
+# ==========================================
+
+def get_interview_system_prompt(role: str, skills: list) -> str:
+    """Generate a role-specific interview system prompt."""
+    skill_str = ", ".join(skills[:8]) if skills else "general software engineering"
+    return f"""You are a senior technical hiring manager interviewing a candidate for a {role} position.
+The role requires expertise in: {skill_str}.
+
+Rules:
+- Ask ONE technical interview question at a time, specific to {role}.
+- Keep responses under 2 sentences.
+- If the candidate's answer lacks depth, ask a challenging follow-up. Do not sugarcoat.
+- Start with a brief greeting and your first question.
+- Vary question difficulty: start medium, then adapt based on answers.
+- Cover: technical knowledge, problem-solving, system design concepts relevant to {role}."""
+
+
+@app.websocket("/ws/interview/{user_id}")
+async def interview_endpoint(websocket: WebSocket, user_id: int):
+    await websocket.accept()
+
+    # Fetch user's target role and skills for personalized interview
+    target_role = "Full Stack Engineer"
+    role_skills = []
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT target_roles, known_skills, extracted_cv_skills FROM user_profiles WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        if row:
+            target_roles = row[0] or []
+            known_skills = row[1] or []
+            cv_skills = row[2] or []
+            all_skills = list(set(known_skills + cv_skills))
+
+            if target_roles:
+                target_role = target_roles[0]
+            else:
+                # Find best matching role
+                user_skills_lower = set(s.lower() for s in all_skills)
+                best_role = None
+                best_match = -1
+                for role_name, meta in ROLE_CATALOG.items():
+                    matched = sum(1 for s in meta["skills"] if s in user_skills_lower)
+                    if matched > best_match:
+                        best_match = matched
+                        best_role = role_name
+                if best_role:
+                    target_role = best_role
+
+            role_skills = ROLE_CATALOG.get(target_role, {}).get("skills", [])
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+
+    system_prompt = get_interview_system_prompt(target_role, role_skills)
+    chat_history = [{"role": "system", "content": system_prompt}]
+    turn_count = 0
+
+    # Send initial info to frontend
+    await websocket.send_text(json.dumps({
+        "type": "init",
+        "role": target_role,
+        "skills": role_skills[:6],
+        "max_turns": INTERVIEW_MAX_TURNS
+    }))
+
+    try:
+        while True:
+            audio_bytes = await websocket.receive_bytes()
+
+            if len(audio_bytes) < 100:
+                continue
+
+            turn_count += 1
+            await websocket.send_text(json.dumps({
+                "type": "status",
+                "text": f"Processing answer {turn_count}/{INTERVIEW_MAX_TURNS}..."
+            }))
+
+            temp_audio_path = ""
+            try:
+                # 1. Transcribe audio with Whisper
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
+                    temp_audio.write(audio_bytes)
+                    temp_audio_path = temp_audio.name
+
+                with open(temp_audio_path, "rb") as file:
+                    transcription = groq_client.audio.transcriptions.create(
+                        file=(temp_audio_path, file.read()),
+                        model="whisper-large-v3-turbo"
+                    )
+                user_text = transcription.text
+                os.remove(temp_audio_path)
+                temp_audio_path = ""
+
+                if not user_text.strip():
+                    turn_count -= 1
+                    continue
+
+                # Send candidate transcript
+                await websocket.send_text(json.dumps({
+                    "type": "transcript",
+                    "speaker": "Candidate",
+                    "text": user_text,
+                    "turn": turn_count
+                }))
+                chat_history.append({"role": "user", "content": user_text})
+
+                # Force conclusion on last turn
+                if turn_count >= INTERVIEW_MAX_TURNS:
+                    chat_history.append({
+                        "role": "system",
+                        "content": "This is the final turn. Thank the candidate briefly and conclude. DO NOT ask any more questions."
+                    })
+
+                # 2. Generate AI interviewer response
+                completion = groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=chat_history,
+                    temperature=0.6,
+                    max_tokens=150
+                )
+                ai_text = completion.choices[0].message.content
+                chat_history.append({"role": "assistant", "content": ai_text})
+
+                await websocket.send_text(json.dumps({
+                    "type": "transcript",
+                    "speaker": "Interviewer",
+                    "text": ai_text,
+                    "turn": turn_count
+                }))
+
+                # 3. Generate TTS audio
+                tts_audio_path = tempfile.mktemp(suffix=".mp3")
+                communicate = edge_tts.Communicate(ai_text, "en-US-AndrewMultilingualNeural")
+                await communicate.save(tts_audio_path)
+
+                with open(tts_audio_path, "rb") as audio_file:
+                    await websocket.send_bytes(audio_file.read())
+                os.remove(tts_audio_path)
+
+                # 4. Generate analysis on final turn
+                if turn_count >= INTERVIEW_MAX_TURNS:
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "text": "Interview complete. Generating performance analysis..."
+                    }))
+
+                    analysis_prompt = f"""You are a brutally honest senior {target_role} interviewer.
+Analyze this interview transcript. Do not sugarcoat.
+Output ONLY a strict JSON object with these exact keys:
+"technical_score" (int 1-10),
+"communication_score" (int 1-10),
+"confidence_score" (int 1-10),
+"overall_grade" (string: "A+", "A", "B+", "B", "C+", "C", "D", or "F"),
+"strengths" (list of 2-4 specific strings),
+"critical_weaknesses" (list of 2-4 specific strings — highlight missing knowledge),
+"study_topics" (list of 3-5 specific technical topics to study),
+"verdict" (one sentence overall assessment)"""
+
+                    analysis_messages = [{"role": "system", "content": analysis_prompt}] + [
+                        m for m in chat_history if m["role"] != "system"
+                    ]
+
+                    analysis_completion = groq_client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=analysis_messages,
+                        response_format={"type": "json_object"}
+                    )
+
+                    try:
+                        analysis_data = json.loads(analysis_completion.choices[0].message.content)
+                    except json.JSONDecodeError:
+                        analysis_data = {
+                            "technical_score": 5,
+                            "communication_score": 5,
+                            "confidence_score": 5,
+                            "overall_grade": "C",
+                            "strengths": ["Completed the interview"],
+                            "critical_weaknesses": ["Could not parse analysis"],
+                            "study_topics": ["Practice more technical interviews"],
+                            "verdict": "Analysis could not be generated. Please try again."
+                        }
+
+                    # Store interview result in database
+                    try:
+                        conn = get_db()
+                        cur = conn.cursor()
+                        cur.execute("""
+                            CREATE TABLE IF NOT EXISTS interview_history (
+                                id SERIAL PRIMARY KEY,
+                                user_id INTEGER NOT NULL,
+                                target_role VARCHAR(100),
+                                technical_score INTEGER,
+                                communication_score INTEGER,
+                                confidence_score INTEGER,
+                                overall_grade VARCHAR(5),
+                                strengths TEXT[],
+                                weaknesses TEXT[],
+                                study_topics TEXT[],
+                                verdict TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        """)
+                        cur.execute("""
+                            INSERT INTO interview_history
+                            (user_id, target_role, technical_score, communication_score, confidence_score,
+                             overall_grade, strengths, weaknesses, study_topics, verdict)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            user_id, target_role,
+                            analysis_data.get("technical_score", 5),
+                            analysis_data.get("communication_score", 5),
+                            analysis_data.get("confidence_score", 5),
+                            analysis_data.get("overall_grade", "C"),
+                            analysis_data.get("strengths", []),
+                            analysis_data.get("critical_weaknesses", []),
+                            analysis_data.get("study_topics", []),
+                            analysis_data.get("verdict", "")
+                        ))
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+                    except Exception as db_err:
+                        print(f"DB save error: {db_err}")
+
+                    # Send analysis to frontend
+                    await websocket.send_text(json.dumps({
+                        "type": "analysis",
+                        "payload": analysis_data,
+                        "role": target_role
+                    }))
+
+                    await websocket.close()
+                    break
+
+            except Exception as inner_e:
+                print(f"Interview error: {str(inner_e)}")
+                traceback.print_exc()
+                if temp_audio_path and os.path.exists(temp_audio_path):
+                    os.remove(temp_audio_path)
+
+    except WebSocketDisconnect:
+        print(f"Interview WebSocket disconnected for user {user_id}")
+
+
+@app.get("/api/interview/history/{user_id}")
+def get_interview_history(user_id: int):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        # Ensure table exists
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS interview_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                target_role VARCHAR(100),
+                technical_score INTEGER,
+                communication_score INTEGER,
+                confidence_score INTEGER,
+                overall_grade VARCHAR(5),
+                strengths TEXT[],
+                weaknesses TEXT[],
+                study_topics TEXT[],
+                verdict TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+
+        cur.execute("""
+            SELECT * FROM interview_history
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            LIMIT 10
+        """, (user_id,))
+        rows = cur.fetchall()
+
+        # Convert datetime objects to strings
+        history = []
+        for row in rows:
+            entry = dict(row)
+            if entry.get("created_at"):
+                entry["created_at"] = entry["created_at"].isoformat()
+            history.append(entry)
+
+        return {"status": "success", "history": history, "total": len(history)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        cur.close()
+        conn.close()

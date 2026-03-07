@@ -1,0 +1,8 @@
+fastapi[all]
+uvicorn
+psycopg2-binary
+PyPDF2
+bcrypt
+groq
+edge-tts
+python-multipart
